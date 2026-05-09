@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 const Video = require("../models/video.model");
 const User = require("../models/user.model");
 const { MAX_THUMBNAIL_SIZE } = require("../middleware/upload.middleware");
+const {
+  isProcessingActive,
+  resolveUploadPath,
+  startVideoProcessing
+} = require("../services/videoProcessing.service");
 
 const VISIBILITY_VALUES = new Set(["public", "private", "unlisted"]);
 
@@ -56,10 +61,19 @@ const buildVideoResponse = (video) => ({
   _id: video._id,
   title: video.title,
   description: video.description,
+  originalFile: video.originalFile,
   videoFile: video.videoFile,
+  hlsUrl: video.hlsUrl,
+  masterPlaylistUrl: video.masterPlaylistUrl,
   thumbnail: video.thumbnail,
   owner: video.owner,
   duration: video.duration,
+  qualities: video.qualities,
+  processingProgress: video.processingProgress,
+  processingError: video.processingError,
+  fileSize: video.fileSize,
+  format: video.format,
+  resolution: video.resolution,
   views: video.views,
   likesCount: video.likesCount,
   dislikesCount: video.dislikesCount,
@@ -109,15 +123,21 @@ const uploadVideo = async (req, res, next) => {
       tags,
       visibility,
       owner: req.user._id,
-      videoFile: `/uploads/videos/${videoFile.filename}`,
-      thumbnail: thumbnailFile ? `/uploads/thumbnails/${thumbnailFile.filename}` : ""
+      originalFile: `/uploads/originals/${videoFile.filename}`,
+      videoFile: `/uploads/originals/${videoFile.filename}`,
+      thumbnail: thumbnailFile ? `/uploads/thumbnails/${thumbnailFile.filename}` : "",
+      fileSize: videoFile.size,
+      status: "processing",
+      processingProgress: 0,
+      processingError: ""
     });
 
     await syncUserVideoTotals(req.user._id);
+    startVideoProcessing(video._id);
 
     res.status(201).json({
       success: true,
-      message: "Video uploaded successfully",
+      message: "Video uploaded successfully and is being processed",
       video: buildVideoResponse(video)
     });
   } catch (err) {
@@ -208,20 +228,124 @@ const getVideoById = async (req, res, next) => {
       throw new Error("This video is private");
     }
 
-    if (video.status !== "published" && !isOwner && !isAdmin) {
-      res.status(404);
-      throw new Error("Video not available");
-    }
-
-    try {
-      await Video.updateOne({ _id: video._id }, { $inc: { views: 1 } });
-      video.views += 1;
-    } catch (error) {
-      console.warn("View count update failed:", error.message);
+    if (video.status === "published") {
+      try {
+        await Video.updateOne({ _id: video._id }, { $inc: { views: 1 } });
+        video.views += 1;
+      } catch (error) {
+        console.warn("View count update failed:", error.message);
+      }
     }
 
     res.status(200).json({
       success: true,
+      video: buildVideoResponse(video)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getVideoStatus = async (req, res, next) => {
+  try {
+    const { videoId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+      res.status(400);
+      throw new Error("Invalid video ID");
+    }
+
+    const video = await Video.findById(videoId).populate(
+      "owner",
+      "username fullName avatar channelName subscribersCount totalVideos totalViews"
+    );
+
+    if (!video || video.isDeleted) {
+      res.status(404);
+      throw new Error("Video not found");
+    }
+
+    const isOwner = req.user && video.owner?._id?.toString() === req.user._id.toString();
+    const isAdmin = req.user && req.user.role === "admin";
+
+    if (video.visibility === "private" && !isOwner && !isAdmin) {
+      res.status(403);
+      throw new Error("This video is private");
+    }
+
+    res.status(200).json({
+      success: true,
+      status: video.status,
+      processingProgress: video.processingProgress || 0,
+      processingError: video.processingError || "",
+      video: buildVideoResponse(video)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const retryVideoProcessing = async (req, res, next) => {
+  try {
+    const { videoId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+      res.status(400);
+      throw new Error("Invalid video ID");
+    }
+
+    const video = await Video.findById(videoId);
+
+    if (!video || video.isDeleted) {
+      res.status(404);
+      throw new Error("Video not found");
+    }
+
+    const isOwner = video.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
+      res.status(403);
+      throw new Error("You cannot retry processing for this video");
+    }
+
+    if (video.status === "processing" || isProcessingActive(video._id)) {
+      res.status(409);
+      throw new Error("Video processing is already running");
+    }
+
+    if (!["failed", "uploaded"].includes(video.status)) {
+      res.status(400);
+      throw new Error("Only failed or uploaded videos can be retried");
+    }
+
+    try {
+      const originalPath = resolveUploadPath(video.originalFile || video.videoFile);
+      const fs = require("fs");
+      if (!fs.existsSync(originalPath)) {
+        res.status(404);
+        throw new Error("Original video file is missing");
+      }
+    } catch (error) {
+      if (!res.statusCode || res.statusCode === 200) {
+        res.status(400);
+      }
+      throw error;
+    }
+
+    video.status = "processing";
+    video.processingProgress = 0;
+    video.processingError = "";
+    video.masterPlaylistUrl = "";
+    video.hlsUrl = "";
+    video.qualities = [];
+    await video.save();
+
+    startVideoProcessing(video._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Video processing restarted",
       video: buildVideoResponse(video)
     });
   } catch (err) {
@@ -354,7 +478,9 @@ module.exports = {
   uploadVideo,
   getAllPublicVideos,
   getVideoById,
+  getVideoStatus,
   getMyVideos,
   updateVideoDetails,
-  deleteVideo
+  deleteVideo,
+  retryVideoProcessing
 };

@@ -1,29 +1,86 @@
 # StreamHub
 
-StreamHub is a beginner-to-advanced video streaming platform built with React, Express, and MongoDB. Phase 5 is complete and adds playlists, subscriptions, creator channel pages, and creator dashboard stats on top of uploads, auth, engagement, and watch history.
+StreamHub is a beginner-to-advanced video streaming platform built with React, Express, and MongoDB. Phase 6 is complete and upgrades playback from direct MP4 video to FFmpeg-powered HLS adaptive streaming with local processing.
 
 ## Tech Stack
 
-- Frontend: React with Vite, Tailwind CSS, React Router DOM, Axios
-- Backend: Node.js, Express, MongoDB with Mongoose, JWT auth, Multer
-- Storage in this phase: local video and thumbnail uploads under `server/uploads`
+- Frontend: React with Vite, Tailwind CSS, React Router DOM, Axios, hls.js
+- Backend: Node.js, Express, MongoDB with Mongoose, JWT auth, Multer, fluent-ffmpeg
+- Local processing helpers: ffmpeg-static, ffprobe-static
+- Storage in this phase: local files under `server/uploads`
 
 ## Current Completed Phase
 
-Phase 5: Playlists, Subscriptions, Creator Channel, and Creator Dashboard
+Phase 6: FFmpeg Video Processing and HLS Adaptive Streaming
 
-- Create, update, delete, and browse playlists
-- Add videos to playlists and remove them
-- Reorder videos inside a playlist
-- Respect public, unlisted, and private playlist visibility
-- Subscribe and unsubscribe to creators
-- View subscribed creators
-- View public creator channel pages
-- Edit your own channel details
-- Browse public videos by creator
-- View creator dashboard stats and top videos
+- Original videos are stored locally.
+- Uploaded videos enter `processing` status.
+- FFprobe extracts duration, format, file size, and resolution.
+- FFmpeg generates a thumbnail when one is not uploaded.
+- FFmpeg creates HLS variants without upscaling above source resolution.
+- A master HLS playlist is generated for adaptive playback.
+- Watch page uses an HLS player with hls.js fallback.
+- My Videos shows processing status, progress, qualities, and retry controls.
+- Failed or uploaded videos can be retried by owner/admin.
 
-Phase 5 does not include HLS, FFmpeg transcoding, recommendations, admin dashboard, payments, or real-time notifications.
+Phase 6 does not include recommendations, admin dashboard, payments, real-time notifications, cloud storage, Redis, or external queues.
+
+## FFmpeg Requirement
+
+This repo installs `ffmpeg-static` and `ffprobe-static`, so the backend can usually process videos without a system FFmpeg install.
+
+For Windows system FFmpeg setup:
+
+1. Download FFmpeg from `https://www.gyan.dev/ffmpeg/builds/` or the official FFmpeg site.
+2. Extract it, for example to `C:\ffmpeg`.
+3. Add `C:\ffmpeg\bin` to your Windows `PATH`.
+4. Restart the terminal.
+5. Verify:
+
+```bash
+ffmpeg -version
+ffprobe -version
+```
+
+Optional environment overrides:
+
+```env
+FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
+FFPROBE_PATH=C:\ffmpeg\bin\ffprobe.exe
+```
+
+If FFmpeg or FFprobe is missing, the upload still creates a video record, then processing fails gracefully with a readable `processingError`.
+
+## Upload Folder Structure
+
+```text
+server/uploads/
+  originals/
+  videos/
+  thumbnails/
+  hls/
+    videoId/
+      master.m3u8
+      144p/
+        index.m3u8
+        segment001.ts
+      240p/
+      360p/
+      480p/
+      720p/
+      1080p/
+```
+
+`videos/` remains for compatibility, while new uploads are stored in `originals/`.
+
+## Video Status Workflow
+
+- `uploaded`: video exists but processing has not started or is ready to retry.
+- `processing`: FFmpeg is extracting metadata, generating thumbnail, and creating HLS.
+- `published`: HLS files are ready and the video is playable.
+- `failed`: processing failed; owner/admin can retry.
+
+The frontend polls `/api/videos/:videoId/status` every 5 seconds while a video is uploaded or processing.
 
 ## Environment Variables
 
@@ -45,7 +102,9 @@ Client: `client/.env`
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-## How to Run the Backend
+## How to Run
+
+Backend:
 
 ```bash
 cd server
@@ -53,7 +112,7 @@ npm install
 npm run dev
 ```
 
-## How to Run the Frontend
+Frontend:
 
 ```bash
 cd client
@@ -61,45 +120,46 @@ npm install
 npm run dev
 ```
 
-## Backend Models
+## Backend Additions
 
-Existing models:
+New service:
 
-- `User`
-- `Video`
-- `Like`
-- `Comment`
-- `WatchHistory`
+- `server/src/services/videoProcessing.service.js`
+  - Checks FFmpeg/FFprobe availability.
+  - Extracts metadata.
+  - Generates thumbnails.
+  - Creates HLS variants.
+  - Writes `master.m3u8`.
+  - Updates video status, progress, and errors.
 
-New in Phase 5:
+Updated model:
 
-- `server/src/models/playlist.model.js`
-  - Stores playlist name, description, owner, visibility, thumbnail, videos, count, and soft-delete flag.
-- `server/src/models/subscription.model.js`
-  - Stores subscriber and channel relationships.
-  - Uses a unique compound index on `subscriber + channel`.
+- `server/src/models/video.model.js`
+  - `originalFile`
+  - `hlsUrl`
+  - `masterPlaylistUrl`
+  - `qualities`
+  - `processingProgress`
+  - `processingError`
+  - `fileSize`
+  - `format`
+  - `resolution`
+  - `status: uploaded | processing | published | failed`
 
-User model additions:
+Updated middleware:
 
-- `channelName`
-- `channelDescription`
-- `channelBanner`
-- `subscribersCount`
-- `subscribedToCount`
-- `totalVideos`
-- `totalViews`
+- Uploads now store original videos in `server/uploads/originals`.
+- HLS static files use correct MIME types for `.m3u8` and `.ts`.
+- Private HLS file access is guarded by JWT for HLS requests.
 
 ## API Routes
 
-Auth:
+Video processing:
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `POST /api/auth/refresh-token`
+- `GET /api/videos/:videoId/status`
+- `POST /api/videos/:videoId/retry-processing`
 
-Videos and engagement:
+Existing video routes still apply:
 
 - `POST /api/videos/upload`
 - `GET /api/videos`
@@ -107,170 +167,127 @@ Videos and engagement:
 - `GET /api/videos/:videoId`
 - `PATCH /api/videos/:videoId`
 - `DELETE /api/videos/:videoId`
-- `POST /api/videos/:videoId/like`
-- `POST /api/videos/:videoId/dislike`
-- `GET /api/videos/:videoId/reaction`
-- `POST /api/videos/:videoId/comments`
-- `GET /api/videos/:videoId/comments`
-- `POST /api/videos/:videoId/watch-history`
 
-Comments:
+Upload response now returns a processing video:
 
-- `PATCH /api/comments/:commentId`
-- `DELETE /api/comments/:commentId`
+```json
+{
+  "success": true,
+  "message": "Video uploaded successfully and is being processed",
+  "video": {
+    "_id": "...",
+    "status": "processing",
+    "processingProgress": 0
+  }
+}
+```
 
-Watch history:
+## Frontend Additions
 
-- `GET /api/users/watch-history`
-- `DELETE /api/users/watch-history/:historyId`
-- `DELETE /api/users/watch-history`
+New components:
 
-Playlists:
+- `client/src/components/HLSPlayer.jsx`
+- `client/src/components/VideoStatusBadge.jsx`
+- `client/src/components/ProcessingProgress.jsx`
 
-- `POST /api/playlists`
-- `GET /api/playlists`
-- `GET /api/playlists/my-playlists`
-- `GET /api/playlists/:playlistId`
-- `PATCH /api/playlists/:playlistId`
-- `DELETE /api/playlists/:playlistId`
-- `POST /api/playlists/:playlistId/videos/:videoId`
-- `DELETE /api/playlists/:playlistId/videos/:videoId`
-- `PATCH /api/playlists/:playlistId/reorder`
+Updated pages:
 
-Subscriptions:
+- `WatchVideo.jsx`
+  - Shows processing UI while FFmpeg runs.
+  - Polls video status.
+  - Uses HLS playback when published.
+  - Shows retry button to owner/admin when failed.
+- `UploadVideo.jsx`
+  - Explains that processing starts after upload.
+- `MyVideos.jsx`
+  - Shows status badges, progress, qualities, duration, and retry controls.
 
-- `POST /api/subscriptions/:channelId`
-- `DELETE /api/subscriptions/:channelId`
-- `GET /api/subscriptions/:channelId/status`
-- `GET /api/subscriptions/my-subscriptions`
-- `GET /api/subscriptions/:channelId/subscribers`
+## How to Upload and Process a Video
 
-Channels:
+1. Start backend and frontend.
+2. Log in.
+3. Open `/upload`.
+4. Upload an MP4, MOV, MKV, or WebM file.
+5. Open `/my-videos`.
+6. Watch the status move from `processing` to `published`.
+7. Open the published video.
 
-- `GET /api/channels/:username`
-- `PATCH /api/channels/me`
-- `GET /api/channels/:username/videos`
-- `GET /api/channels/me/dashboard`
+## How to Verify Generated HLS Files
 
-Protected routes use `req.user` from JWT middleware. The frontend never sends trusted owner, creator, or user IDs for protected ownership decisions.
+After processing completes, check:
 
-## Frontend Pages
+```text
+server/uploads/hls/<videoId>/master.m3u8
+server/uploads/hls/<videoId>/<quality>/index.m3u8
+server/uploads/hls/<videoId>/<quality>/segment001.ts
+```
 
-- `/` - Home
-- `/login` - Login
-- `/register` - Register
-- `/profile` - Protected profile page with channel links
-- `/videos` - Public video listing
-- `/watch/:videoId` - Watch page with engagement, subscribe, and save-to-playlist
-- `/upload` - Protected upload page
-- `/my-videos` - Protected creator video manager
-- `/history` - Protected watch history page
-- `/playlists` - Public playlist listing
-- `/my-playlists` - Protected playlist manager
-- `/playlists/:playlistId` - Playlist detail page
-- `/create-playlist` - Protected playlist creation
-- `/subscriptions` - Protected subscribed channels page
-- `/channel/:username` - Public creator channel page
-- `/channel/edit` - Protected channel editor
-- `/creator-dashboard` - Protected creator dashboard
-- `/*` - Not found page
+Open the video document in MongoDB and confirm:
 
-## Frontend Services
+- `status` is `published`
+- `masterPlaylistUrl` points to `/uploads/hls/<videoId>/master.m3u8`
+- `qualities` contains generated variants
+- `duration`, `format`, `fileSize`, and `resolution` are populated
 
-New in Phase 5:
+## How to Test HLS Playback
 
-- `client/src/services/playlistService.js`
-  - `createPlaylist(data)`
-  - `getMyPlaylists(params)`
-  - `getPublicPlaylists(params)`
-  - `getPlaylistById(playlistId)`
-  - `updatePlaylist(playlistId, data)`
-  - `deletePlaylist(playlistId)`
-  - `addVideoToPlaylist(playlistId, videoId)`
-  - `removeVideoFromPlaylist(playlistId, videoId)`
-  - `reorderPlaylistVideos(playlistId, videoIds)`
-- `client/src/services/subscriptionService.js`
-  - `subscribeToChannel(channelId)`
-  - `unsubscribeFromChannel(channelId)`
-  - `getSubscriptionStatus(channelId)`
-  - `getMySubscriptions(params)`
-- `client/src/services/channelService.js`
-  - `getChannelByUsername(username)`
-  - `updateMyChannel(data)`
-  - `getChannelVideos(username, params)`
-  - `getCreatorDashboardStats()`
+1. Upload and wait for a video to become `published`.
+2. Open `/watch/:videoId`.
+3. Confirm the player loads from `masterPlaylistUrl`.
+4. Refresh the page and confirm watch history resume still works.
+5. Try Chrome/Edge/Firefox to exercise hls.js.
+6. Try Safari to exercise native HLS support.
 
-## How to Test Playlist Creation
+## How to Retry Failed Processing
 
-1. Log in.
-2. Open `/create-playlist`.
-3. Enter a name, optional description, and visibility.
-4. Submit the form.
-5. Confirm you land on the playlist detail page.
-6. Open `/my-playlists` and confirm the playlist appears.
+From frontend:
 
-## How to Test Adding Video to Playlist
+1. Open `/my-videos`.
+2. Find a video with `failed` status.
+3. Click `Retry Processing`.
 
-1. Log in and create a playlist.
-2. Open a public video at `/watch/:videoId`.
-3. Click `Save to Playlist`.
-4. Select your playlist.
-5. Open the playlist detail page and confirm the video appears.
-6. Try saving the same video again and confirm the friendly duplicate message appears.
-7. As the playlist owner, remove the video from the playlist.
+From API:
 
-## How to Test Subscribe and Unsubscribe
+```http
+POST http://localhost:5000/api/videos/<videoId>/retry-processing
+Authorization: Bearer <accessToken>
+```
 
-1. Create or log in as User A and upload a public video.
-2. Log in as User B.
-3. Open User A's channel at `/channel/:username`.
-4. Click `Subscribe`.
-5. Confirm subscriber count updates immediately.
-6. Open `/subscriptions` and confirm User A appears.
-7. Unsubscribe from `/subscriptions` or the channel page.
+Only the video owner or an admin can retry.
 
-## How to Test Channel Page
+## Debugging FFmpeg Errors
 
-1. Open `/channel/:username`.
-2. Confirm channel name, username, description, subscriber count, total videos, and total views appear.
-3. Confirm only public, published, non-deleted videos are listed.
-4. Log out and confirm the channel remains viewable.
-5. Click subscribe while logged out and confirm the UI asks you to log in.
-
-## How to Test Creator Dashboard
-
-1. Log in as a creator/user with uploaded videos.
-2. Open `/creator-dashboard`.
-3. Confirm total videos, views, likes, comments, subscribers, public videos, and private videos appear.
-4. Confirm top videos are sorted by views.
-5. Delete a video and reload the dashboard to confirm deleted videos are not counted.
+- Run `ffmpeg -version` and `ffprobe -version`.
+- Check the video's `processingError` field.
+- Confirm the original file exists in `server/uploads/originals`.
+- Confirm disk space is available.
+- Try a known-good MP4 file.
+- If a video has no video stream, processing will fail.
+- If thumbnail generation fails, processing continues and stores a warning.
+- If HLS segment generation fails, the video status becomes `failed`.
 
 ## Common Errors and Fixes
 
-- `Access token is missing`: log in and retry the protected action.
-- `Token expired`: log in again.
-- `Invalid playlist ID`: verify the playlist URL contains a valid MongoDB ObjectId.
-- `Playlist name is required`: enter a non-empty playlist name.
-- `Visibility must be public, private, or unlisted`: choose a valid visibility value.
-- `This playlist is private`: only the owner can view private playlists.
-- `You cannot manage this playlist`: only playlist owners can edit, delete, add, remove, or reorder videos.
-- `Video already exists in this playlist`: choose another playlist or remove the existing item first.
-- `You cannot add this private video`: private videos can only be added by their owner.
-- `You cannot subscribe to yourself`: use another account to test subscriptions.
-- `Already subscribed to this channel`: refresh subscription status or unsubscribe first.
-- `Channel not found`: confirm the username or channel ID exists and the user is not banned.
-- `You cannot view this subscriber list`: only the channel owner or admin can view full subscriber lists.
+- `FFMPEG is not available`: install FFmpeg or use `ffmpeg-static`.
+- `FFPROBE is not available`: install FFprobe or use `ffprobe-static`.
+- `Original video file is missing`: re-upload or restore the original file.
+- `No video stream found in uploaded file`: upload a real video file.
+- `Video resolution could not be detected`: the file may be corrupted.
+- `HLS playback failed`: check that `master.m3u8`, quality playlists, and segments exist.
+- `Video source unavailable`: the video is published but has no HLS or fallback file path.
+- `Video processing is already running`: wait for the current processing attempt.
+- `Only failed or uploaded videos can be retried`: published videos do not need retry.
+- `This video is private`: only the owner/admin can view private video metadata.
 
 ## Verification
 
-Useful backend checks:
+Backend checks:
 
 ```bash
 cd server
-node --check src/controllers/playlist.controller.js
-node --check src/controllers/subscription.controller.js
-node --check src/controllers/channel.controller.js
+node --check src/services/videoProcessing.service.js
 node --check src/controllers/video.controller.js
+node --check src/middleware/hlsAccess.middleware.js
 ```
 
 Frontend build:
@@ -282,4 +299,4 @@ npm run build
 
 ## Next Phase Placeholder
 
-Phase 6 can add streaming infrastructure such as HLS playback and FFmpeg-based transcoding. That work is intentionally not included in Phase 5.
+Phase 7 can add scalable media infrastructure: cloud object storage, CDN delivery, a Redis-backed processing queue, and stronger private media delivery. Those are intentionally not included in Phase 6.

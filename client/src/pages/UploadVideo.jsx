@@ -111,8 +111,11 @@ export default function UploadVideo() {
         })
       );
 
-      setStatus({ type: "success", message: "Video uploaded successfully." });
-      setTimeout(() => navigate("/my-videos"), 800);
+      setStatus({
+        type: "success",
+        message: "Video uploaded and processing started. You can track it in My Videos."
+      });
+      setTimeout(() => navigate("/my-videos"), 1200);
     } catch (error) {
       const message =
         error?.response?.data?.message ||
@@ -130,7 +133,8 @@ export default function UploadVideo() {
         <div className="rounded-2xl border border-slate-200 bg-white/80 p-8 shadow-sm">
           <h1 className="text-2xl font-semibold text-slate-900">Upload a video</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Share your content with the StreamHub community.
+            Share your content with the StreamHub community. After upload, StreamHub will
+            process your video into HLS streaming qualities.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">

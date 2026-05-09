@@ -14,9 +14,21 @@ const videoSchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, "Description must be less than 1000 characters"]
     },
+    originalFile: {
+      type: String,
+      default: ""
+    },
     videoFile: {
       type: String,
       required: [true, "Video file is required"]
+    },
+    hlsUrl: {
+      type: String,
+      default: ""
+    },
+    masterPlaylistUrl: {
+      type: String,
+      default: ""
     },
     thumbnail: {
       type: String,
@@ -30,6 +42,59 @@ const videoSchema = new mongoose.Schema(
     duration: {
       type: Number,
       default: 0
+    },
+    qualities: {
+      type: [
+        {
+          quality: {
+            type: String,
+            required: true
+          },
+          width: {
+            type: Number,
+            required: true
+          },
+          height: {
+            type: Number,
+            required: true
+          },
+          playlistUrl: {
+            type: String,
+            required: true
+          },
+          bitrate: {
+            type: String,
+            required: true
+          }
+        }
+      ],
+      default: []
+    },
+    processingProgress: {
+      type: Number,
+      default: 0
+    },
+    processingError: {
+      type: String,
+      default: ""
+    },
+    fileSize: {
+      type: Number,
+      default: 0
+    },
+    format: {
+      type: String,
+      default: ""
+    },
+    resolution: {
+      width: {
+        type: Number,
+        default: 0
+      },
+      height: {
+        type: Number,
+        default: 0
+      }
     },
     views: {
       type: Number,
@@ -63,8 +128,8 @@ const videoSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["processing", "published", "failed"],
-      default: "published"
+      enum: ["uploaded", "processing", "published", "failed"],
+      default: "uploaded"
     },
     isDeleted: {
       type: Boolean,

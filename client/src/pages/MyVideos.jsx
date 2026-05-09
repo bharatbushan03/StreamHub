@@ -2,10 +2,20 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import ProcessingProgress from "../components/ProcessingProgress";
+import VideoStatusBadge from "../components/VideoStatusBadge";
 import api, { createUploadConfig } from "../services/api";
+import { retryVideoProcessing } from "../services/videoService";
 import { getAssetUrl } from "../utils/url";
 
 const visibilityOptions = ["public", "private", "unlisted"];
+
+const formatDuration = (value) => {
+  const totalSeconds = Math.max(0, Math.floor(Number(value) || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
 
 export default function MyVideos() {
   const [videos, setVideos] = useState([]);
@@ -21,6 +31,7 @@ export default function MyVideos() {
     thumbnail: null
   });
   const [status, setStatus] = useState({ type: "", message: "" });
+  const [retryingId, setRetryingId] = useState("");
 
   const fetchMyVideos = async () => {
     setLoading(true);
@@ -42,6 +53,19 @@ export default function MyVideos() {
   useEffect(() => {
     fetchMyVideos();
   }, []);
+
+  useEffect(() => {
+    const hasProcessingVideos = videos.some((video) =>
+      ["uploaded", "processing"].includes(video.status)
+    );
+
+    if (!hasProcessingVideos) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(fetchMyVideos, 5000);
+    return () => window.clearInterval(timer);
+  }, [videos]);
 
   const startEditing = (video) => {
     setEditingId(video._id);
@@ -135,6 +159,27 @@ export default function MyVideos() {
     }
   };
 
+  const handleRetryProcessing = async (videoId) => {
+    setRetryingId(videoId);
+    setStatus({ type: "", message: "" });
+
+    try {
+      const response = await retryVideoProcessing(videoId);
+      const updatedVideo = response.data?.video;
+      setVideos((prev) =>
+        prev.map((video) => (video._id === videoId ? updatedVideo || video : video))
+      );
+      setStatus({ type: "success", message: "Video processing restarted." });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: err?.response?.data?.message || "Unable to retry video processing."
+      });
+    } finally {
+      setRetryingId("");
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -196,18 +241,41 @@ export default function MyVideos() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {video.visibility} - {video.status} - {video.views} views
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
+                    <VideoStatusBadge status={video.status} />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {video.visibility} - {video.views} views - {formatDuration(video.duration)}
                   </p>
                   <p className="mt-2 text-xs text-slate-500">
                     {video.likesCount || 0} likes - {video.dislikesCount || 0} dislikes - {video.commentsCount || 0} comments
                   </p>
+                  {video.qualities?.length > 0 && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Qualities: {video.qualities.map((item) => item.quality).join(", ")}
+                    </p>
+                  )}
                   <p className="mt-2 text-xs text-slate-500">
                     {new Date(video.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
+
+              {["uploaded", "processing"].includes(video.status) && (
+                <div className="mt-4">
+                  <ProcessingProgress
+                    status={video.status}
+                    progress={video.processingProgress || 0}
+                  />
+                </div>
+              )}
+
+              {video.status === "failed" && (
+                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-100 px-3 py-2 text-sm text-rose-700">
+                  {video.processingError || "Video processing failed."}
+                </div>
+              )}
 
               {editingId === video._id ? (
                 <div className="mt-4 space-y-3">
@@ -282,7 +350,15 @@ export default function MyVideos() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {video.status === "published" && (
+                    <Link
+                      to={`/watch/${video._id}`}
+                      className="rounded-full bg-teal-600 px-4 py-1 text-sm font-semibold text-white hover:bg-teal-700"
+                    >
+                      Watch
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => startEditing(video)}
@@ -290,6 +366,16 @@ export default function MyVideos() {
                   >
                     Edit
                   </button>
+                  {["failed", "uploaded"].includes(video.status) && (
+                    <button
+                      type="button"
+                      disabled={retryingId === video._id}
+                      onClick={() => handleRetryProcessing(video._id)}
+                      className="rounded-full border border-teal-300 px-4 py-1 text-sm font-semibold text-teal-700 hover:border-teal-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {retryingId === video._id ? "Restarting..." : "Retry Processing"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleDelete(video._id)}

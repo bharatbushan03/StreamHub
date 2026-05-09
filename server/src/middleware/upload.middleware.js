@@ -22,8 +22,10 @@ const THUMBNAIL_MIME_TYPES = new Set([
 ]);
 
 const uploadsRoot = path.join(__dirname, "..", "..", "uploads");
+const originalsDir = path.join(uploadsRoot, "originals");
 const videosDir = path.join(uploadsRoot, "videos");
 const thumbnailsDir = path.join(uploadsRoot, "thumbnails");
+const hlsDir = path.join(uploadsRoot, "hls");
 
 const ensureDir = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
@@ -31,13 +33,15 @@ const ensureDir = (dirPath) => {
   }
 };
 
+ensureDir(originalsDir);
 ensureDir(videosDir);
 ensureDir(thumbnailsDir);
+ensureDir(hlsDir);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === "video") {
-      return cb(null, videosDir);
+      return cb(null, originalsDir);
     }
 
     if (file.fieldname === "thumbnail") {
@@ -97,5 +101,10 @@ const uploadThumbnail = upload.single("thumbnail");
 module.exports = {
   uploadVideoFiles,
   uploadThumbnail,
-  MAX_THUMBNAIL_SIZE
+  MAX_THUMBNAIL_SIZE,
+  uploadsRoot,
+  originalsDir,
+  videosDir,
+  thumbnailsDir,
+  hlsDir
 };

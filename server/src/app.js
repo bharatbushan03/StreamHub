@@ -9,6 +9,7 @@ const userRoutes = require("./routes/user.routes");
 const playlistRoutes = require("./routes/playlist.routes");
 const subscriptionRoutes = require("./routes/subscription.routes");
 const channelRoutes = require("./routes/channel.routes");
+const { hlsAccess } = require("./middleware/hlsAccess.middleware");
 const { notFound } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -25,7 +26,25 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+const setUploadHeaders = (res, filePath) => {
+  if (filePath.endsWith(".m3u8")) {
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+  }
+
+  if (filePath.endsWith(".ts")) {
+    res.setHeader("Content-Type", "video/mp2t");
+  }
+
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+};
+
+app.use("/uploads/hls/:videoId", hlsAccess);
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "..", "uploads"), {
+    setHeaders: setUploadHeaders
+  })
+);
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);

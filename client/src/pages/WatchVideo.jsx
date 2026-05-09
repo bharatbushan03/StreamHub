@@ -2,10 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import HLSPlayer from "../components/HLSPlayer";
+import ProcessingProgress from "../components/ProcessingProgress";
+import VideoStatusBadge from "../components/VideoStatusBadge";
 import api from "../services/api";
 import { getAssetUrl } from "../utils/url";
 import { useAuth } from "../context/AuthContext";
-import { dislikeVideo, getVideoReaction, likeVideo } from "../services/videoService";
+import {
+  dislikeVideo,
+  getVideoReaction,
+  getVideoStatus,
+  likeVideo,
+  retryVideoProcessing
+} from "../services/videoService";
 import {
   addComment,
   deleteComment,
@@ -42,7 +51,7 @@ const getEntityId = (entity) => {
 export default function WatchVideo() {
   const { videoId } = useParams();
   const { isAuthenticated, user } = useAuth();
-  const videoRef = useRef(null);
+  const playbackRef = useRef({ currentTime: 0, duration: 0 });
   const lastHistorySyncRef = useRef(0);
 
   const [video, setVideo] = useState(null);
@@ -68,6 +77,7 @@ export default function WatchVideo() {
 
   const [resumePosition, setResumePosition] = useState(0);
   const [playerError, setPlayerError] = useState("");
+  const [retryLoading, setRetryLoading] = useState(false);
 
   const [savePanelOpen, setSavePanelOpen] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
@@ -195,22 +205,26 @@ export default function WatchVideo() {
     fetchSubscription();
   }, [isAuthenticated, video?.owner, user?._id]);
 
-  const applyResumePosition = () => {
-    const player = videoRef.current;
-
-    if (!player || resumePosition <= 0 || !Number.isFinite(player.duration)) {
-      return;
-    }
-
-    const safePosition = Math.min(resumePosition, Math.max(player.duration - 1, 0));
-    if (safePosition > 0 && Math.abs(player.currentTime - safePosition) > 1) {
-      player.currentTime = safePosition;
-    }
-  };
-
   useEffect(() => {
-    applyResumePosition();
-  }, [resumePosition]);
+    if (!video || !["uploaded", "processing"].includes(video.status)) {
+      return undefined;
+    }
+
+    const pollStatus = async () => {
+      try {
+        const response = await getVideoStatus(videoId);
+        const nextVideo = response.data?.video;
+        if (nextVideo) {
+          setVideo(nextVideo);
+        }
+      } catch (err) {
+        setPlayerError(err?.response?.data?.message || "Unable to refresh processing status.");
+      }
+    };
+
+    const timer = window.setInterval(pollStatus, 5000);
+    return () => window.clearInterval(timer);
+  }, [videoId, video?.status]);
 
   const handleReaction = async (type) => {
     if (!isAuthenticated) {
@@ -463,14 +477,32 @@ export default function WatchVideo() {
     }
   };
 
-  const syncWatchHistory = async (completed = false) => {
-    if (!isAuthenticated || !videoRef.current) {
+  const handleRetryProcessing = async () => {
+    if (!video || retryLoading) {
       return;
     }
 
-    const currentTime = Math.floor(videoRef.current.currentTime || 0);
-    const duration = Number.isFinite(videoRef.current.duration)
-      ? Math.floor(videoRef.current.duration)
+    setRetryLoading(true);
+    setPlayerError("");
+
+    try {
+      const response = await retryVideoProcessing(video._id);
+      setVideo(response.data?.video || video);
+    } catch (err) {
+      setPlayerError(err?.response?.data?.message || "Unable to retry processing.");
+    } finally {
+      setRetryLoading(false);
+    }
+  };
+
+  const syncWatchHistory = async (completed = false, playback = playbackRef.current) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const currentTime = Math.floor(playback.currentTime || 0);
+    const duration = Number.isFinite(playback.duration)
+      ? Math.floor(playback.duration)
       : 0;
 
     if (!Number.isFinite(currentTime) || currentTime < 0 || duration < 0) {
@@ -495,26 +527,25 @@ export default function WatchVideo() {
     }
   };
 
-  const handleTimeUpdate = () => {
+  const handlePlayerProgress = (playback) => {
+    playbackRef.current = playback;
+
+    if (playback.eventType === "pause") {
+      syncWatchHistory(false, playback);
+      return;
+    }
+
+    if (playback.eventType === "ended") {
+      syncWatchHistory(true, playback);
+      return;
+    }
+
     const now = Date.now();
     if (now - lastHistorySyncRef.current < HISTORY_SYNC_INTERVAL) {
       return;
     }
     lastHistorySyncRef.current = now;
-    syncWatchHistory(false);
-  };
-
-  const handlePause = () => {
-    syncWatchHistory(false);
-  };
-
-  const handleEnded = () => {
-    syncWatchHistory(true);
-  };
-
-  const handleLoadedMetadata = () => {
-    setPlayerError("");
-    applyResumePosition();
+    syncWatchHistory(false, playback);
   };
 
   const canDeleteComment = (comment) => {
@@ -531,6 +562,10 @@ export default function WatchVideo() {
   const creatorId = getEntityId(video?.owner);
   const isCreator = user && creatorId === user._id;
   const creatorName = video?.owner?.channelName || video?.owner?.fullName || video?.owner?.username;
+  const playbackSource = video?.masterPlaylistUrl || video?.videoFile || video?.originalFile || "";
+  const isPlayable = video?.status === "published";
+  const canRetryProcessing =
+    video && ["failed", "uploaded"].includes(video.status) && (isCreator || user?.role === "admin");
 
   return (
     <div className="min-h-screen">
@@ -546,30 +581,57 @@ export default function WatchVideo() {
 
         {!loading && !error && video && (
           <div className="space-y-6">
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black">
-              {video.videoFile ? (
-                <video
-                  ref={videoRef}
-                  controls
-                  src={getAssetUrl(video.videoFile)}
-                  poster={getAssetUrl(video.thumbnail)}
-                  className="h-full w-full"
-                  onTimeUpdate={handleTimeUpdate}
-                  onPause={handlePause}
-                  onEnded={handleEnded}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onError={() =>
-                    setPlayerError("This video could not be loaded by your browser.")
-                  }
-                >
-                  Your browser does not support this video format.
-                </video>
-              ) : (
-                <div className="flex aspect-video items-center justify-center px-6 text-center text-sm text-white">
-                  Video source is missing.
+            {isPlayable && playbackSource ? (
+              <HLSPlayer
+                src={getAssetUrl(playbackSource)}
+                poster={getAssetUrl(video.thumbnail)}
+                resumeTime={resumePosition}
+                onProgress={handlePlayerProgress}
+                onError={setPlayerError}
+              />
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white/80 p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {video.status === "failed"
+                        ? "Processing failed"
+                        : video.status === "published"
+                          ? "Video source unavailable"
+                          : "Video is processing"}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {video.status === "failed"
+                        ? video.processingError || "The video could not be processed."
+                        : video.status === "published"
+                          ? "The HLS playlist is missing and no fallback file is available."
+                          : "Your video is being converted to HLS adaptive streams."}
+                    </p>
+                  </div>
+                  <VideoStatusBadge status={video.status} />
                 </div>
-              )}
-            </div>
+
+                {video.status !== "failed" && (
+                  <div className="mt-5">
+                    <ProcessingProgress
+                      status={video.status}
+                      progress={video.processingProgress || 0}
+                    />
+                  </div>
+                )}
+
+                {canRetryProcessing && (
+                  <button
+                    type="button"
+                    disabled={retryLoading}
+                    onClick={handleRetryProcessing}
+                    className="mt-5 rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {retryLoading ? "Restarting..." : "Retry Processing"}
+                  </button>
+                )}
+              </div>
+            )}
 
             {playerError && (
               <div className="rounded-lg border border-rose-200 bg-rose-100 px-4 py-3 text-sm text-rose-700">

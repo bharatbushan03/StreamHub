@@ -3,9 +3,11 @@ const {
   uploadVideo,
   getAllPublicVideos,
   getVideoById,
+  getVideoStatus,
   getMyVideos,
   updateVideoDetails,
-  deleteVideo
+  deleteVideo,
+  retryVideoProcessing
 } = require("../controllers/video.controller");
 const {
   toggleLike,
@@ -27,6 +29,8 @@ const router = express.Router();
 router.post("/upload", verifyJWT, uploadVideoFiles, uploadVideo);
 router.get("/", getAllPublicVideos);
 router.get("/my-videos", verifyJWT, getMyVideos);
+router.get("/:videoId/status", optionalAuth, getVideoStatus);
+router.post("/:videoId/retry-processing", verifyJWT, retryVideoProcessing);
 router.post("/:videoId/like", verifyJWT, toggleLike);
 router.post("/:videoId/dislike", verifyJWT, toggleDislike);
 router.get("/:videoId/reaction", verifyJWT, getVideoReactionStatus);
