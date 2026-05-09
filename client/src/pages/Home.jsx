@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -69,22 +70,22 @@ export default function Home() {
               Your video platform from beginner to pro
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600">
-              Build, learn, and scale a modern streaming product. Phase 1 brings the
-              foundation: backend health checks and a clean frontend layout.
+              Build, learn, and scale a modern streaming product. Phase 3 adds
+              video uploads and public listings on top of the auth foundation.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
+              <Link
+                to="/videos"
                 className="rounded-full bg-teal-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
               >
                 Explore Videos
-              </button>
-              <button
-                type="button"
+              </Link>
+              <Link
+                to="/upload"
                 className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
               >
                 Creator Studio
-              </button>
+              </Link>
             </div>
           </div>
         </section>

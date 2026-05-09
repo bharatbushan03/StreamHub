@@ -20,8 +20,17 @@ export default function Navbar() {
           <Link to="/" className="hover:text-slate-900">
             Home
           </Link>
+          <Link to="/videos" className="hover:text-slate-900">
+            Videos
+          </Link>
           {isAuthenticated ? (
             <>
+              <Link to="/upload" className="hover:text-slate-900">
+                Upload
+              </Link>
+              <Link to="/my-videos" className="hover:text-slate-900">
+                My Videos
+              </Link>
               <Link to="/profile" className="hover:text-slate-900">
                 Profile
               </Link>

@@ -1,5 +1,5 @@
 const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : 500;
+  let statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500);
   let message = err.message || "Server error";
 
   if (err.code === 11000) {
@@ -23,6 +23,16 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === "TokenExpiredError") {
     statusCode = 401;
     message = "Token expired";
+  }
+
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      statusCode = 413;
+      message = "File is too large";
+    } else {
+      statusCode = 400;
+      message = err.message || "Upload error";
+    }
   }
 
   res.status(statusCode).json({

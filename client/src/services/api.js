@@ -34,3 +34,10 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+export const createUploadConfig = (onUploadProgress) => ({
+  headers: {
+    "Content-Type": "multipart/form-data"
+  },
+  onUploadProgress
+});

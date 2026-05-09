@@ -1,7 +1,9 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const healthRoutes = require("./routes/health");
 const authRoutes = require("./routes/auth.routes");
+const videoRoutes = require("./routes/video.routes");
 const { notFound } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -18,8 +20,11 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/videos", videoRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

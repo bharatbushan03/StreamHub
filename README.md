@@ -1,10 +1,10 @@
 # StreamHub
 
-StreamHub is a beginner-to-advanced video streaming platform. Phase 2 adds a full authentication system on top of the Phase 1 setup.
+StreamHub is a beginner-to-advanced video streaming platform. Phase 3 adds video uploads and listing on top of the Phase 2 auth system.
 
 ## Tech Stack
 - Frontend: React (Vite), Tailwind CSS, React Router DOM, Axios
-- Backend: Node.js, Express, MongoDB (Mongoose), dotenv, cors, nodemon
+- Backend: Node.js, Express, MongoDB (Mongoose), dotenv, cors, nodemon, multer
 
 ## Folder Structure
 ```
@@ -55,6 +55,28 @@ VITE_API_BASE_URL=http://localhost:5000/api
 - GET /api/auth/me
 - POST /api/auth/refresh-token
 
+## Video Routes (Phase 3)
+- POST /api/videos/upload
+- GET /api/videos
+- GET /api/videos/my-videos
+- GET /api/videos/:videoId
+- PATCH /api/videos/:videoId
+- DELETE /api/videos/:videoId
+
+## Frontend Pages (Phase 3)
+- /videos
+- /watch/:videoId
+- /upload
+- /my-videos
+
+## Upload Limits and Formats
+- Video max size: 200MB
+- Thumbnail max size: 5MB
+- Video formats: mp4, mov, mkv, webm
+- Thumbnail formats: jpg, jpeg, png, webp
+- Uploaded files are served from http://localhost:5000/uploads/
+- Phase 3 stores files locally under server/uploads.
+
 ## How to Test Auth with Postman
 1. Register
   - POST http://localhost:5000/api/auth/register
@@ -74,8 +96,33 @@ VITE_API_BASE_URL=http://localhost:5000/api
 - After login, you should land on /profile.
 - Refresh the page to confirm the session persists.
 
+## How to Test Video Upload (Frontend)
+- Log in and open /upload.
+- Fill title and choose a video file.
+- Submit and you should land on /my-videos.
+- Visit /videos to see public videos and click any card to watch.
+
+## How to Test Video Upload (Postman)
+- POST http://localhost:5000/api/videos/upload
+- Headers: Authorization: Bearer <accessToken>
+- Body: form-data with fields
+  - title: My First Video
+  - description: This is my first upload
+  - category: Education
+  - tags: react,node,streaming
+  - visibility: public
+  - video: <file>
+  - thumbnail: <file> (optional)
+
+## Common Upload Errors and Fixes
+- "Access token is missing": log in and send the Authorization header.
+- "Video file is required": ensure form-data includes the video field.
+- "Unsupported video format": use mp4, mov, mkv, or webm.
+- "File is too large": keep videos under 200MB and thumbnails under 5MB.
+- "Invalid video ID": verify the URL parameter is a valid ObjectId.
+
 ## Current Completed Phase
-Phase 2: Authentication (register/login/logout, protected routes, session persistence).
+Phase 3: Video upload and listing (local storage, protected upload, public listing, watch page).
 
 ## Next Phase (Placeholder)
-Phase 3: Video upload basics and creator video listing.
+Phase 4: Video interactions (likes, comments) and basic creator analytics.

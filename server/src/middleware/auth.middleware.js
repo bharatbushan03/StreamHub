@@ -39,4 +39,46 @@ const verifyJWT = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyJWT };
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization || "";
+
+    if (!authHeader) {
+      return next();
+    }
+
+    if (!authHeader.startsWith("Bearer ")) {
+      res.status(401);
+      throw new Error("Invalid authorization header");
+    }
+
+    if (!process.env.ACCESS_TOKEN_SECRET) {
+      res.status(500);
+      throw new Error("ACCESS_TOKEN_SECRET is missing");
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const user = await User.findById(decoded.id).select("-password -refreshToken");
+
+    if (!user) {
+      res.status(401);
+      throw new Error("User not found");
+    }
+
+    if (user.isBanned) {
+      res.status(403);
+      throw new Error("Account is banned");
+    }
+
+    req.user = user;
+    return next();
+  } catch (err) {
+    if (res.statusCode === 200) {
+      res.status(401);
+    }
+    return next(err);
+  }
+};
+
+module.exports = { verifyJWT, optionalAuth };
