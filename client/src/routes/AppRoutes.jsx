@@ -8,6 +8,14 @@ import WatchVideo from "../pages/WatchVideo";
 import UploadVideo from "../pages/UploadVideo";
 import MyVideos from "../pages/MyVideos";
 import WatchHistory from "../pages/WatchHistory";
+import Playlists from "../pages/Playlists";
+import MyPlaylists from "../pages/MyPlaylists";
+import PlaylistDetails from "../pages/PlaylistDetails";
+import CreatePlaylist from "../pages/CreatePlaylist";
+import Subscriptions from "../pages/Subscriptions";
+import Channel from "../pages/Channel";
+import EditChannel from "../pages/EditChannel";
+import CreatorDashboard from "../pages/CreatorDashboard";
 import NotFound from "../pages/NotFound";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -17,6 +25,9 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/videos" element={<Videos />} />
       <Route path="/watch/:videoId" element={<WatchVideo />} />
+      <Route path="/playlists" element={<Playlists />} />
+      <Route path="/playlists/:playlistId" element={<PlaylistDetails />} />
+      <Route path="/channel/:username" element={<Channel />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route
@@ -32,6 +43,46 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <MyVideos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-playlists"
+        element={
+          <ProtectedRoute>
+            <MyPlaylists />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/create-playlist"
+        element={
+          <ProtectedRoute>
+            <CreatePlaylist />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscriptions"
+        element={
+          <ProtectedRoute>
+            <Subscriptions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/channel/edit"
+        element={
+          <ProtectedRoute>
+            <EditChannel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator-dashboard"
+        element={
+          <ProtectedRoute>
+            <CreatorDashboard />
           </ProtectedRoute>
         }
       />

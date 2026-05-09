@@ -9,7 +9,15 @@ const buildUserResponse = (user) => ({
   fullName: user.fullName,
   username: user.username,
   email: user.email,
-  role: user.role
+  avatar: user.avatar,
+  role: user.role,
+  channelName: user.channelName || "",
+  channelDescription: user.channelDescription || "",
+  channelBanner: user.channelBanner || "",
+  subscribersCount: user.subscribersCount || 0,
+  subscribedToCount: user.subscribedToCount || 0,
+  totalVideos: user.totalVideos || 0,
+  totalViews: user.totalViews || 0
 });
 
 const registerUser = async (req, res, next) => {

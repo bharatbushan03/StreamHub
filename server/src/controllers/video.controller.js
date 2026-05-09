@@ -1,8 +1,11 @@
 const mongoose = require("mongoose");
 const Video = require("../models/video.model");
+const User = require("../models/user.model");
 const { MAX_THUMBNAIL_SIZE } = require("../middleware/upload.middleware");
 
 const VISIBILITY_VALUES = new Set(["public", "private", "unlisted"]);
+
+const getQueryString = (value) => (typeof value === "string" ? value.trim() : "");
 
 const parseTags = (value) => {
   if (!value) {
@@ -17,6 +20,36 @@ const parseTags = (value) => {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+};
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const syncUserVideoTotals = async (userId) => {
+  const [stats] = await Video.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId.toString()),
+        isDeleted: false
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalVideos: { $sum: 1 },
+        totalViews: { $sum: { $ifNull: ["$views", 0] } }
+      }
+    }
+  ]);
+
+  await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        totalVideos: stats?.totalVideos || 0,
+        totalViews: stats?.totalViews || 0
+      }
+    }
+  );
 };
 
 const buildVideoResponse = (video) => ({
@@ -80,6 +113,8 @@ const uploadVideo = async (req, res, next) => {
       thumbnail: thumbnailFile ? `/uploads/thumbnails/${thumbnailFile.filename}` : ""
     });
 
+    await syncUserVideoTotals(req.user._id);
+
     res.status(201).json({
       success: true,
       message: "Video uploaded successfully",
@@ -94,9 +129,9 @@ const getAllPublicVideos = async (req, res, next) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
-    const search = req.query.search?.trim();
-    const category = req.query.category?.trim();
-    const sortBy = req.query.sortBy || "latest";
+    const search = getQueryString(req.query.search);
+    const category = getQueryString(req.query.category);
+    const sortBy = getQueryString(req.query.sortBy) || "latest";
 
     const query = {
       visibility: "public",
@@ -106,8 +141,8 @@ const getAllPublicVideos = async (req, res, next) => {
 
     if (search) {
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
+        { title: { $regex: escapeRegex(search), $options: "i" } },
+        { description: { $regex: escapeRegex(search), $options: "i" } }
       ];
     }
 
@@ -125,7 +160,7 @@ const getAllPublicVideos = async (req, res, next) => {
 
     const totalVideos = await Video.countDocuments(query);
     const videos = await Video.find(query)
-      .populate("owner", "username fullName")
+      .populate("owner", "username fullName avatar channelName")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit);
@@ -155,7 +190,10 @@ const getVideoById = async (req, res, next) => {
       throw new Error("Invalid video ID");
     }
 
-    const video = await Video.findById(videoId).populate("owner", "username fullName");
+    const video = await Video.findById(videoId).populate(
+      "owner",
+      "username fullName avatar channelName subscribersCount totalVideos totalViews"
+    );
 
     if (!video || video.isDeleted) {
       res.status(404);
@@ -301,6 +339,7 @@ const deleteVideo = async (req, res, next) => {
 
     video.isDeleted = true;
     await video.save();
+    await syncUserVideoTotals(video.owner);
 
     res.status(200).json({
       success: true,

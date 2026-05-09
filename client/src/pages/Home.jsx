@@ -8,7 +8,7 @@ import FeatureCard from "../components/FeatureCard";
 const features = [
   {
     title: "Creator ready",
-    description: "A clean upload workflow and studio tools will be layered in next phases."
+    description: "Channels, subscriptions, playlists, and dashboard stats are now ready."
   },
   {
     title: "Streaming focused",
@@ -16,7 +16,7 @@ const features = [
   },
   {
     title: "Community driven",
-    description: "Likes, dislikes, comments, and watch history are now part of the core flow."
+    description: "Likes, comments, watch history, playlists, and subscriptions power discovery."
   }
 ];
 
@@ -67,8 +67,8 @@ export default function Home() {
               Your video platform from beginner to pro
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600">
-              Build, learn, and scale a modern streaming product. Phase 4 adds
-              reactions, comments, watch history, and resume playback.
+              Build, learn, and scale a modern streaming product. Phase 5 adds
+              creator channels, playlists, subscriptions, and dashboard stats.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
@@ -78,10 +78,10 @@ export default function Home() {
                 Explore Videos
               </Link>
               <Link
-                to="/upload"
+                to="/playlists"
                 className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
               >
-                Creator Studio
+                Browse Playlists
               </Link>
             </div>
           </div>

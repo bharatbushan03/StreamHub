@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import api, { createUploadConfig } from "../services/api";
@@ -138,9 +139,17 @@ export default function MyVideos() {
     <div className="min-h-screen">
       <Navbar />
       <main className="mx-auto w-full max-w-6xl px-6 py-12">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-slate-900">My videos</h1>
-          <p className="text-sm text-slate-600">Manage the videos you have uploaded.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">My videos</h1>
+            <p className="text-sm text-slate-600">Manage the videos you have uploaded.</p>
+          </div>
+          <Link
+            to="/creator-dashboard"
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Creator dashboard
+          </Link>
         </div>
 
         {loading && <div className="mt-10 text-sm text-slate-600">Loading your videos...</div>}

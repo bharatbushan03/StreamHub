@@ -23,6 +23,9 @@ export default function Navbar() {
           <Link to="/videos" className="hover:text-slate-900">
             Videos
           </Link>
+          <Link to="/playlists" className="hover:text-slate-900">
+            Playlists
+          </Link>
           {isAuthenticated ? (
             <>
               <Link to="/upload" className="hover:text-slate-900">
@@ -31,8 +34,17 @@ export default function Navbar() {
               <Link to="/my-videos" className="hover:text-slate-900">
                 My Videos
               </Link>
+              <Link to="/my-playlists" className="hover:text-slate-900">
+                My Playlists
+              </Link>
+              <Link to="/subscriptions" className="hover:text-slate-900">
+                Subscriptions
+              </Link>
               <Link to="/history" className="hover:text-slate-900">
                 History
+              </Link>
+              <Link to="/creator-dashboard" className="hover:text-slate-900">
+                Dashboard
               </Link>
               <Link to="/profile" className="hover:text-slate-900">
                 Profile

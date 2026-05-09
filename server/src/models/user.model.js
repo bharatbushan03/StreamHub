@@ -36,6 +36,36 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    channelName: {
+      type: String,
+      trim: true,
+      maxlength: [80, "Channel name must be less than 80 characters"]
+    },
+    channelDescription: {
+      type: String,
+      trim: true,
+      maxlength: [1000, "Channel description must be less than 1000 characters"]
+    },
+    channelBanner: {
+      type: String,
+      default: ""
+    },
+    subscribersCount: {
+      type: Number,
+      default: 0
+    },
+    subscribedToCount: {
+      type: Number,
+      default: 0
+    },
+    totalVideos: {
+      type: Number,
+      default: 0
+    },
+    totalViews: {
+      type: Number,
+      default: 0
+    },
     role: {
       type: String,
       enum: ["user", "creator", "admin"],

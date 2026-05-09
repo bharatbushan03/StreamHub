@@ -3,13 +3,11 @@ import { getAssetUrl } from "../utils/url";
 
 export default function VideoCard({ video }) {
   const thumbnailUrl = getAssetUrl(video.thumbnail);
+  const ownerName = video.owner?.channelName || video.owner?.username || "Creator";
 
   return (
-    <Link
-      to={`/watch/${video._id}`}
-      className="group overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-sm transition hover:-translate-y-0.5"
-    >
-      <div className="aspect-video w-full overflow-hidden bg-slate-100">
+    <div className="group overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-sm transition hover:-translate-y-0.5">
+      <Link to={`/watch/${video._id}`} className="block aspect-video w-full overflow-hidden bg-slate-100">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
@@ -21,11 +19,26 @@ export default function VideoCard({ video }) {
             No thumbnail
           </div>
         )}
-      </div>
+      </Link>
       <div className="p-4">
-        <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
+        <Link
+          to={`/watch/${video._id}`}
+          className="text-base font-semibold text-slate-900 hover:text-teal-700"
+        >
+          {video.title}
+        </Link>
         <p className="mt-2 text-xs text-slate-500">
-          {video.owner?.username || "Creator"} - {video.views} views
+          {video.owner?.username ? (
+            <Link
+              to={`/channel/${video.owner.username}`}
+              className="font-semibold text-teal-700 hover:text-teal-800"
+            >
+              {ownerName}
+            </Link>
+          ) : (
+            ownerName
+          )}{" "}
+          - {video.views} views
         </p>
         <p className="mt-2 text-xs text-slate-500">
           {video.likesCount || 0} likes - {video.commentsCount || 0} comments
@@ -34,6 +47,6 @@ export default function VideoCard({ video }) {
           {video.category} - {new Date(video.createdAt).toLocaleDateString()}
         </p>
       </div>
-    </Link>
+    </div>
   );
 }

@@ -6,6 +6,9 @@ const authRoutes = require("./routes/auth.routes");
 const videoRoutes = require("./routes/video.routes");
 const commentRoutes = require("./routes/comment.routes");
 const userRoutes = require("./routes/user.routes");
+const playlistRoutes = require("./routes/playlist.routes");
+const subscriptionRoutes = require("./routes/subscription.routes");
+const channelRoutes = require("./routes/channel.routes");
 const { notFound } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -29,6 +32,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/playlists", playlistRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/channels", channelRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -1,6 +1,6 @@
 # StreamHub
 
-StreamHub is a beginner-to-advanced video streaming platform built with React, Express, and MongoDB. Phase 4 is complete and adds the video engagement system on top of authentication, uploads, listings, and direct playback.
+StreamHub is a beginner-to-advanced video streaming platform built with React, Express, and MongoDB. Phase 5 is complete and adds playlists, subscriptions, creator channel pages, and creator dashboard stats on top of uploads, auth, engagement, and watch history.
 
 ## Tech Stack
 
@@ -10,43 +10,20 @@ StreamHub is a beginner-to-advanced video streaming platform built with React, E
 
 ## Current Completed Phase
 
-Phase 4: Video Engagement System
+Phase 5: Playlists, Subscriptions, Creator Channel, and Creator Dashboard
 
-- Like and dislike videos
-- Switch between like and dislike
-- Remove an existing like or dislike
-- Add comments
-- Edit your own comments
-- Delete your own comments
-- Allow video owners and admins to delete comments
-- Track watch history for logged-in users
-- Resume videos from the last watched position
-- Show recent watch history
-- Improve safe view count incrementing when a video is opened
+- Create, update, delete, and browse playlists
+- Add videos to playlists and remove them
+- Reorder videos inside a playlist
+- Respect public, unlisted, and private playlist visibility
+- Subscribe and unsubscribe to creators
+- View subscribed creators
+- View public creator channel pages
+- Edit your own channel details
+- Browse public videos by creator
+- View creator dashboard stats and top videos
 
-Phase 4 does not include HLS, FFmpeg transcoding, playlists, subscriptions, recommendations, or an admin dashboard.
-
-## Folder Structure
-
-```text
-streamhub/
-  client/
-    src/
-      components/
-      context/
-      pages/
-      routes/
-      services/
-      utils/
-  server/
-    src/
-      controllers/
-      middleware/
-      models/
-      routes/
-      utils/
-  README.md
-```
+Phase 5 does not include HLS, FFmpeg transcoding, recommendations, admin dashboard, payments, or real-time notifications.
 
 ## Environment Variables
 
@@ -76,8 +53,6 @@ npm install
 npm run dev
 ```
 
-The backend defaults to `http://localhost:5000`.
-
 ## How to Run the Frontend
 
 ```bash
@@ -86,21 +61,35 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to `http://localhost:5173`.
+## Backend Models
 
-## Backend Models Added in Phase 4
+Existing models:
 
-- `server/src/models/like.model.js`
-  - Stores one `like` or `dislike` reaction per user per video.
-  - Uses a unique compound index on `video + user`.
-- `server/src/models/comment.model.js`
-  - Stores comments with edit and soft-delete flags.
-  - Limits content to 1,000 characters.
-- `server/src/models/watchHistory.model.js`
-  - Stores resume position, watched duration, completed state, and last watched time.
-  - Uses a unique compound index on `user + video`.
+- `User`
+- `Video`
+- `Like`
+- `Comment`
+- `WatchHistory`
 
-## Backend Routes
+New in Phase 5:
+
+- `server/src/models/playlist.model.js`
+  - Stores playlist name, description, owner, visibility, thumbnail, videos, count, and soft-delete flag.
+- `server/src/models/subscription.model.js`
+  - Stores subscriber and channel relationships.
+  - Uses a unique compound index on `subscriber + channel`.
+
+User model additions:
+
+- `channelName`
+- `channelDescription`
+- `channelBanner`
+- `subscribersCount`
+- `subscribedToCount`
+- `totalVideos`
+- `totalViews`
+
+## API Routes
 
 Auth:
 
@@ -110,7 +99,7 @@ Auth:
 - `GET /api/auth/me`
 - `POST /api/auth/refresh-token`
 
-Videos:
+Videos and engagement:
 
 - `POST /api/videos/upload`
 - `GET /api/videos`
@@ -118,194 +107,173 @@ Videos:
 - `GET /api/videos/:videoId`
 - `PATCH /api/videos/:videoId`
 - `DELETE /api/videos/:videoId`
-
-Engagement:
-
 - `POST /api/videos/:videoId/like`
 - `POST /api/videos/:videoId/dislike`
 - `GET /api/videos/:videoId/reaction`
 - `POST /api/videos/:videoId/comments`
-- `GET /api/videos/:videoId/comments?page=1&limit=20&sortBy=latest`
+- `GET /api/videos/:videoId/comments`
+- `POST /api/videos/:videoId/watch-history`
+
+Comments:
+
 - `PATCH /api/comments/:commentId`
 - `DELETE /api/comments/:commentId`
 
 Watch history:
 
-- `POST /api/videos/:videoId/watch-history`
-- `GET /api/users/watch-history?page=1&limit=20`
+- `GET /api/users/watch-history`
 - `DELETE /api/users/watch-history/:historyId`
 - `DELETE /api/users/watch-history`
 
-Protected engagement routes use `req.user` from the JWT middleware. The frontend never sends a trusted `userId`.
+Playlists:
+
+- `POST /api/playlists`
+- `GET /api/playlists`
+- `GET /api/playlists/my-playlists`
+- `GET /api/playlists/:playlistId`
+- `PATCH /api/playlists/:playlistId`
+- `DELETE /api/playlists/:playlistId`
+- `POST /api/playlists/:playlistId/videos/:videoId`
+- `DELETE /api/playlists/:playlistId/videos/:videoId`
+- `PATCH /api/playlists/:playlistId/reorder`
+
+Subscriptions:
+
+- `POST /api/subscriptions/:channelId`
+- `DELETE /api/subscriptions/:channelId`
+- `GET /api/subscriptions/:channelId/status`
+- `GET /api/subscriptions/my-subscriptions`
+- `GET /api/subscriptions/:channelId/subscribers`
+
+Channels:
+
+- `GET /api/channels/:username`
+- `PATCH /api/channels/me`
+- `GET /api/channels/:username/videos`
+- `GET /api/channels/me/dashboard`
+
+Protected routes use `req.user` from JWT middleware. The frontend never sends trusted owner, creator, or user IDs for protected ownership decisions.
 
 ## Frontend Pages
 
 - `/` - Home
 - `/login` - Login
 - `/register` - Register
-- `/profile` - Protected profile page
+- `/profile` - Protected profile page with channel links
 - `/videos` - Public video listing
-- `/watch/:videoId` - Watch page with likes, dislikes, comments, and resume tracking
+- `/watch/:videoId` - Watch page with engagement, subscribe, and save-to-playlist
 - `/upload` - Protected upload page
-- `/my-videos` - Protected creator video manager with engagement counts
+- `/my-videos` - Protected creator video manager
 - `/history` - Protected watch history page
+- `/playlists` - Public playlist listing
+- `/my-playlists` - Protected playlist manager
+- `/playlists/:playlistId` - Playlist detail page
+- `/create-playlist` - Protected playlist creation
+- `/subscriptions` - Protected subscribed channels page
+- `/channel/:username` - Public creator channel page
+- `/channel/edit` - Protected channel editor
+- `/creator-dashboard` - Protected creator dashboard
 - `/*` - Not found page
 
-## Frontend Services Added in Phase 4
+## Frontend Services
 
-- `client/src/services/videoService.js`
-  - `likeVideo(videoId)`
-  - `dislikeVideo(videoId)`
-  - `getVideoReaction(videoId)`
-- `client/src/services/commentService.js`
-  - `getComments(videoId, params)`
-  - `addComment(videoId, content)`
-  - `updateComment(commentId, content)`
-  - `deleteComment(commentId)`
-- `client/src/services/watchHistoryService.js`
-  - `updateWatchHistory(videoId, data)`
-  - `getMyWatchHistory(params)`
-  - `deleteWatchHistoryItem(historyId)`
-  - `clearWatchHistory()`
+New in Phase 5:
 
-## How to Test Likes and Dislikes
+- `client/src/services/playlistService.js`
+  - `createPlaylist(data)`
+  - `getMyPlaylists(params)`
+  - `getPublicPlaylists(params)`
+  - `getPlaylistById(playlistId)`
+  - `updatePlaylist(playlistId, data)`
+  - `deletePlaylist(playlistId)`
+  - `addVideoToPlaylist(playlistId, videoId)`
+  - `removeVideoFromPlaylist(playlistId, videoId)`
+  - `reorderPlaylistVideos(playlistId, videoIds)`
+- `client/src/services/subscriptionService.js`
+  - `subscribeToChannel(channelId)`
+  - `unsubscribeFromChannel(channelId)`
+  - `getSubscriptionStatus(channelId)`
+  - `getMySubscriptions(params)`
+- `client/src/services/channelService.js`
+  - `getChannelByUsername(username)`
+  - `updateMyChannel(data)`
+  - `getChannelVideos(username, params)`
+  - `getCreatorDashboardStats()`
 
-1. Start the backend and frontend.
-2. Register or log in.
-3. Upload a public video or open an existing public video at `/watch/:videoId`.
-4. Click `Like`.
-5. Click `Like` again to remove the like.
-6. Click `Dislike`.
-7. Click `Like` after disliking to confirm it switches from dislike to like.
-8. Log out and click a reaction button to confirm the UI asks you to log in.
-
-Postman examples:
-
-```http
-POST http://localhost:5000/api/videos/<videoId>/like
-Authorization: Bearer <accessToken>
-```
-
-```http
-POST http://localhost:5000/api/videos/<videoId>/dislike
-Authorization: Bearer <accessToken>
-```
-
-```http
-GET http://localhost:5000/api/videos/<videoId>/reaction
-Authorization: Bearer <accessToken>
-```
-
-## How to Test Comments
-
-1. Open a public or unlisted video.
-2. Confirm comments are visible while logged out.
-3. Log in and post a comment.
-4. Try an empty comment and a comment over 1,000 characters to confirm validation.
-5. Edit your own comment.
-6. Delete your own comment.
-7. As the video owner, delete another user's comment on your video.
-8. Confirm deleted comments no longer appear publicly.
-
-Postman examples:
-
-```http
-POST http://localhost:5000/api/videos/<videoId>/comments
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-
-{
-  "content": "This is a great video"
-}
-```
-
-```http
-GET http://localhost:5000/api/videos/<videoId>/comments?page=1&limit=20&sortBy=latest
-```
-
-```http
-PATCH http://localhost:5000/api/comments/<commentId>
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-
-{
-  "content": "Updated comment"
-}
-```
-
-```http
-DELETE http://localhost:5000/api/comments/<commentId>
-Authorization: Bearer <accessToken>
-```
-
-## How to Test Watch History
+## How to Test Playlist Creation
 
 1. Log in.
-2. Open a video at `/watch/:videoId`.
-3. Play for at least 10 to 15 seconds.
-4. Pause the video to force a progress sync.
-5. Refresh the page and confirm playback resumes near the last watched position.
-6. Open `/history` and confirm the video appears with progress.
-7. Use `Continue` to return to the video.
-8. Remove one history item.
-9. Use `Clear history` to remove all history records.
+2. Open `/create-playlist`.
+3. Enter a name, optional description, and visibility.
+4. Submit the form.
+5. Confirm you land on the playlist detail page.
+6. Open `/my-playlists` and confirm the playlist appears.
 
-Postman examples:
+## How to Test Adding Video to Playlist
 
-```http
-POST http://localhost:5000/api/videos/<videoId>/watch-history
-Authorization: Bearer <accessToken>
-Content-Type: application/json
+1. Log in and create a playlist.
+2. Open a public video at `/watch/:videoId`.
+3. Click `Save to Playlist`.
+4. Select your playlist.
+5. Open the playlist detail page and confirm the video appears.
+6. Try saving the same video again and confirm the friendly duplicate message appears.
+7. As the playlist owner, remove the video from the playlist.
 
-{
-  "lastWatchedPosition": 120,
-  "watchedDuration": 120,
-  "completed": false
-}
-```
+## How to Test Subscribe and Unsubscribe
 
-```http
-GET http://localhost:5000/api/users/watch-history?page=1&limit=20
-Authorization: Bearer <accessToken>
-```
+1. Create or log in as User A and upload a public video.
+2. Log in as User B.
+3. Open User A's channel at `/channel/:username`.
+4. Click `Subscribe`.
+5. Confirm subscriber count updates immediately.
+6. Open `/subscriptions` and confirm User A appears.
+7. Unsubscribe from `/subscriptions` or the channel page.
 
-```http
-DELETE http://localhost:5000/api/users/watch-history/<historyId>
-Authorization: Bearer <accessToken>
-```
+## How to Test Channel Page
 
-```http
-DELETE http://localhost:5000/api/users/watch-history
-Authorization: Bearer <accessToken>
-```
+1. Open `/channel/:username`.
+2. Confirm channel name, username, description, subscriber count, total videos, and total views appear.
+3. Confirm only public, published, non-deleted videos are listed.
+4. Log out and confirm the channel remains viewable.
+5. Click subscribe while logged out and confirm the UI asks you to log in.
+
+## How to Test Creator Dashboard
+
+1. Log in as a creator/user with uploaded videos.
+2. Open `/creator-dashboard`.
+3. Confirm total videos, views, likes, comments, subscribers, public videos, and private videos appear.
+4. Confirm top videos are sorted by views.
+5. Delete a video and reload the dashboard to confirm deleted videos are not counted.
 
 ## Common Errors and Fixes
 
-- `Access token is missing`: log in and send `Authorization: Bearer <accessToken>`.
-- `Token expired`: log in again and retry the protected action.
-- `Invalid video ID`: verify the URL contains a valid MongoDB ObjectId.
-- `Video not found`: the video may not exist or may have been soft deleted.
-- `This video is private`: only the video owner can engage with or track a private video in this phase.
-- `Comment cannot be empty`: send non-empty content after trimming spaces.
-- `Comment must be less than 1000 characters`: shorten the comment.
-- `You cannot edit this comment`: only the comment owner can edit it.
-- `You cannot delete this comment`: only the comment owner, video owner, or admin can delete it.
-- `Last watched position cannot be negative`: send zero or a positive number.
-- `Watched duration cannot be negative`: send zero or a positive number.
-- `Completed must be true or false`: send a boolean value.
-- Upload errors: keep videos under 200MB, thumbnails under 5MB, and use supported formats.
+- `Access token is missing`: log in and retry the protected action.
+- `Token expired`: log in again.
+- `Invalid playlist ID`: verify the playlist URL contains a valid MongoDB ObjectId.
+- `Playlist name is required`: enter a non-empty playlist name.
+- `Visibility must be public, private, or unlisted`: choose a valid visibility value.
+- `This playlist is private`: only the owner can view private playlists.
+- `You cannot manage this playlist`: only playlist owners can edit, delete, add, remove, or reorder videos.
+- `Video already exists in this playlist`: choose another playlist or remove the existing item first.
+- `You cannot add this private video`: private videos can only be added by their owner.
+- `You cannot subscribe to yourself`: use another account to test subscriptions.
+- `Already subscribed to this channel`: refresh subscription status or unsubscribe first.
+- `Channel not found`: confirm the username or channel ID exists and the user is not banned.
+- `You cannot view this subscriber list`: only the channel owner or admin can view full subscriber lists.
 
 ## Verification
 
-Useful checks:
+Useful backend checks:
 
 ```bash
 cd server
-node --check src/controllers/like.controller.js
-node --check src/controllers/comment.controller.js
-node --check src/controllers/watchHistory.controller.js
+node --check src/controllers/playlist.controller.js
+node --check src/controllers/subscription.controller.js
+node --check src/controllers/channel.controller.js
 node --check src/controllers/video.controller.js
 ```
+
+Frontend build:
 
 ```bash
 cd client
@@ -314,4 +282,4 @@ npm run build
 
 ## Next Phase Placeholder
 
-Phase 5 will be built after the next instruction. A likely next milestone is streaming infrastructure, such as HLS playback and FFmpeg-based transcoding, but it has not been added in Phase 4.
+Phase 6 can add streaming infrastructure such as HLS playback and FFmpeg-based transcoding. That work is intentionally not included in Phase 5.

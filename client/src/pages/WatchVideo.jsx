@@ -16,6 +16,15 @@ import {
   getMyWatchHistory,
   updateWatchHistory
 } from "../services/watchHistoryService";
+import {
+  addVideoToPlaylist,
+  getMyPlaylists
+} from "../services/playlistService";
+import {
+  getSubscriptionStatus,
+  subscribeToChannel,
+  unsubscribeFromChannel
+} from "../services/subscriptionService";
 
 const COMMENT_LIMIT = 10;
 const HISTORY_SYNC_INTERVAL = 12000;
@@ -59,6 +68,16 @@ export default function WatchVideo() {
 
   const [resumePosition, setResumePosition] = useState(0);
   const [playerError, setPlayerError] = useState("");
+
+  const [savePanelOpen, setSavePanelOpen] = useState(false);
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(false);
+  const [savingPlaylistId, setSavingPlaylistId] = useState("");
+  const [saveStatus, setSaveStatus] = useState({ type: "", message: "" });
+
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
 
   const fetchVideo = async () => {
     setLoading(true);
@@ -147,6 +166,34 @@ export default function WatchVideo() {
     fetchReaction();
     fetchResumePosition();
   }, [videoId, isAuthenticated]);
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      const ownerId = getEntityId(video?.owner);
+
+      if (!isAuthenticated || !ownerId || ownerId === user?._id) {
+        setIsSubscribed(false);
+        setSubscriptionMessage("");
+        return;
+      }
+
+      setSubscriptionLoading(true);
+      setSubscriptionMessage("");
+
+      try {
+        const response = await getSubscriptionStatus(ownerId);
+        setIsSubscribed(Boolean(response.data?.isSubscribed));
+      } catch (err) {
+        setSubscriptionMessage(
+          err?.response?.data?.message || "Unable to load subscription status."
+        );
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    fetchSubscription();
+  }, [isAuthenticated, video?.owner, user?._id]);
 
   const applyResumePosition = () => {
     const player = videoRef.current;
@@ -322,6 +369,100 @@ export default function WatchVideo() {
     }
   };
 
+  const loadMyPlaylists = async () => {
+    setPlaylistsLoading(true);
+    setSaveStatus({ type: "", message: "" });
+
+    try {
+      const response = await getMyPlaylists({ page: 1, limit: 50 });
+      setMyPlaylists(response.data?.playlists || []);
+    } catch (err) {
+      setSaveStatus({
+        type: "error",
+        message: err?.response?.data?.message || "Unable to load your playlists."
+      });
+    } finally {
+      setPlaylistsLoading(false);
+    }
+  };
+
+  const handleOpenSavePanel = async () => {
+    if (!isAuthenticated) {
+      setSaveStatus({ type: "error", message: "Log in to save videos to playlists." });
+      return;
+    }
+
+    const nextOpen = !savePanelOpen;
+    setSavePanelOpen(nextOpen);
+
+    if (nextOpen && myPlaylists.length === 0) {
+      await loadMyPlaylists();
+    }
+  };
+
+  const handleSaveToPlaylist = async (playlistId) => {
+    setSavingPlaylistId(playlistId);
+    setSaveStatus({ type: "", message: "" });
+
+    try {
+      await addVideoToPlaylist(playlistId, videoId);
+      setSaveStatus({ type: "success", message: "Video saved to playlist." });
+    } catch (err) {
+      const message =
+        err?.response?.data?.message === "Video already exists in this playlist"
+          ? "This video is already in that playlist."
+          : err?.response?.data?.message || "Unable to save video to playlist.";
+      setSaveStatus({ type: "error", message });
+    } finally {
+      setSavingPlaylistId("");
+    }
+  };
+
+  const handleSubscribe = async () => {
+    const ownerId = getEntityId(video?.owner);
+
+    if (!isAuthenticated) {
+      setSubscriptionMessage("Log in to subscribe to this creator.");
+      return;
+    }
+
+    if (!ownerId || ownerId === user?._id || subscriptionLoading) {
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    setSubscriptionMessage("");
+
+    try {
+      const response = isSubscribed
+        ? await unsubscribeFromChannel(ownerId)
+        : await subscribeToChannel(ownerId);
+
+      setIsSubscribed(Boolean(response.data?.isSubscribed));
+      setVideo((prev) =>
+        prev
+          ? {
+              ...prev,
+              owner:
+                typeof prev.owner === "object"
+                  ? {
+                      ...prev.owner,
+                      subscribersCount:
+                        response.data?.subscribersCount ?? prev.owner?.subscribersCount
+                    }
+                  : prev.owner
+            }
+          : prev
+      );
+    } catch (err) {
+      setSubscriptionMessage(
+        err?.response?.data?.message || "Unable to update subscription."
+      );
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
   const syncWatchHistory = async (completed = false) => {
     if (!isAuthenticated || !videoRef.current) {
       return;
@@ -387,6 +528,10 @@ export default function WatchVideo() {
 
   const canEditComment = (comment) => user && getEntityId(comment.user) === user._id;
 
+  const creatorId = getEntityId(video?.owner);
+  const isCreator = user && creatorId === user._id;
+  const creatorName = video?.owner?.channelName || video?.owner?.fullName || video?.owner?.username;
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -437,10 +582,10 @@ export default function WatchVideo() {
                 <div>
                   <h1 className="text-2xl font-semibold text-slate-900">{video.title}</h1>
                   <p className="mt-2 text-sm text-slate-600">
-                    {video.owner?.username || "Creator"} - {formatCount(video.views)} views
+                    {formatCount(video.views)} views
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     disabled={reactionLoading || reactionStatusLoading}
@@ -465,7 +610,49 @@ export default function WatchVideo() {
                   >
                     Dislike ({formatCount(video.dislikesCount)})
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenSavePanel}
+                    className="rounded-full border border-slate-300 px-4 py-1 text-sm font-semibold text-slate-700 transition hover:border-slate-400"
+                  >
+                    Save to Playlist
+                  </button>
                 </div>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Creator</p>
+                  {video.owner?.username ? (
+                    <Link
+                      to={`/channel/${video.owner.username}`}
+                      className="mt-1 inline-flex text-sm font-semibold text-slate-900 hover:text-teal-700"
+                    >
+                      {creatorName || "Creator"}
+                    </Link>
+                  ) : (
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {creatorName || "Creator"}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-slate-500">
+                    {video.owner?.subscribersCount || 0} subscribers
+                  </p>
+                </div>
+                {!isCreator && (
+                  <button
+                    type="button"
+                    disabled={subscriptionLoading}
+                    onClick={handleSubscribe}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                      isSubscribed
+                        ? "border border-slate-300 text-slate-700 hover:border-slate-400"
+                        : "bg-teal-600 text-white hover:bg-teal-700"
+                    }`}
+                  >
+                    {subscriptionLoading ? "Working..." : isSubscribed ? "Unsubscribe" : "Subscribe"}
+                  </button>
+                )}
               </div>
 
               {reactionStatusLoading && (
@@ -474,6 +661,63 @@ export default function WatchVideo() {
 
               {reactionMessage && (
                 <p className="mt-3 text-sm text-rose-600">{reactionMessage}</p>
+              )}
+
+              {subscriptionMessage && (
+                <p className="mt-3 text-sm text-rose-600">{subscriptionMessage}</p>
+              )}
+
+              {saveStatus.message && (
+                <p
+                  className={`mt-3 text-sm ${
+                    saveStatus.type === "error" ? "text-rose-600" : "text-emerald-700"
+                  }`}
+                >
+                  {saveStatus.message}
+                </p>
+              )}
+
+              {savePanelOpen && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-slate-900">Save to playlist</h2>
+                    <Link
+                      to="/create-playlist"
+                      className="text-xs font-semibold text-teal-700 hover:text-teal-800"
+                    >
+                      New playlist
+                    </Link>
+                  </div>
+
+                  {playlistsLoading && (
+                    <p className="mt-4 text-sm text-slate-600">Loading your playlists...</p>
+                  )}
+
+                  {!playlistsLoading && myPlaylists.length === 0 && (
+                    <p className="mt-4 text-sm text-slate-600">
+                      You do not have any playlists yet.
+                    </p>
+                  )}
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {myPlaylists.map((playlist) => (
+                      <button
+                        key={playlist._id}
+                        type="button"
+                        disabled={savingPlaylistId === playlist._id}
+                        onClick={() => handleSaveToPlaylist(playlist._id)}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-700 hover:border-teal-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span className="block font-semibold text-slate-900">
+                          {playlist.name}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {playlist.visibility} - {playlist.videosCount || 0} videos
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <p className="mt-4 text-sm text-slate-600">{video.description}</p>
