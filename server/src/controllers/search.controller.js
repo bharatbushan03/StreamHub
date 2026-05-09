@@ -44,7 +44,8 @@ const parseTags = (value) => {
 const publicPublishedQuery = () => ({
   visibility: "public",
   status: "published",
-  isDeleted: false
+  isDeleted: false,
+  isBlocked: false
 });
 
 const getBannedOwnerIds = async () => User.find({ isBanned: true }).distinct("_id");

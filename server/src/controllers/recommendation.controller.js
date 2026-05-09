@@ -25,7 +25,8 @@ const publicPublishedQuery = (excludedOwnerIds = []) => {
   const query = {
     visibility: "public",
     status: "published",
-    isDeleted: false
+    isDeleted: false,
+    isBlocked: false
   };
 
   if (excludedOwnerIds.length > 0) {

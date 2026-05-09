@@ -12,6 +12,8 @@ const channelRoutes = require("./routes/channel.routes");
 const searchRoutes = require("./routes/search.routes");
 const recommendationRoutes = require("./routes/recommendation.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
+const adminRoutes = require("./routes/admin.routes");
+const reportRoutes = require("./routes/report.routes");
 const { hlsAccess } = require("./middleware/hlsAccess.middleware");
 const { notFound } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
@@ -60,6 +62,8 @@ app.use("/api/channels", channelRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/reports", reportRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

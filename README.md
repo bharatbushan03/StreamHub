@@ -134,34 +134,28 @@ Analytics:
 
 All public feeds return only non-deleted, public, published videos.
 
-## New Frontend Pages
+## New Frontend Pages & Components
 
-- `client/src/pages/Search.jsx`
-- `client/src/pages/Trending.jsx`
-- `client/src/pages/SearchHistory.jsx`
-- `client/src/pages/CreatorAnalytics.jsx`
-- `client/src/pages/VideoAnalytics.jsx`
+Admin Pages (`/admin/*`):
+- `AdminDashboard`, `AdminAnalytics`
+- `AdminUsers`, `AdminUserDetails`
+- `AdminVideos`, `AdminVideoDetails`
+- `AdminComments`
+- `AdminReports`, `AdminReportDetails`
 
-Updated pages:
+Other Pages:
+- `MyReports.jsx`
+- `Unauthorized.jsx`
 
-- `Home.jsx`: personalized feed sections.
-- `WatchVideo.jsx`: related videos and throttled analytics tracking.
-- `MyVideos.jsx`: links to creator analytics and per-video analytics.
-- `Videos.jsx`, `Channel.jsx`, `PlaylistDetails.jsx`: click source tracking.
+Components:
+- `AdminLayout.jsx`
+- `AdminRoute.jsx`
+- `ReportModal.jsx`
 
-## New Frontend Components
-
-- `client/src/components/SearchFilters.jsx`
-- `client/src/components/SearchSuggestions.jsx`
-- `client/src/components/AnalyticsCard.jsx`
-- `client/src/components/RelatedVideos.jsx`
-- Updated `VideoCard.jsx` to support click source tracking, duration display, and optional status.
-
-## New Frontend Services
-
-- `client/src/services/searchService.js`
-- `client/src/services/recommendationService.js`
-- `client/src/services/analyticsService.js`
+Updated:
+- `WatchVideo.jsx`: added report button for video and comments.
+- `Navbar.jsx`: added Admin link (conditional) and My Reports.
+- `AppRoutes.jsx`: added protected admin routes.
 
 ## How Recommendation Works
 

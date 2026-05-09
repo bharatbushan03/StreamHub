@@ -26,6 +26,27 @@ const commentSchema = new mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false
+    },
+    blockedReason: {
+      type: String,
+      default: ""
+    },
+    blockedAt: {
+      type: Date,
+      default: null
+    },
+    blockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
+    reportsCount: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }

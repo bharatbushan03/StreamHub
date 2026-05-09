@@ -61,6 +61,14 @@ export default function Navbar() {
               <Link to="/profile" className="hover:text-slate-900">
                 Profile
               </Link>
+              <Link to="/my-reports" className="hover:text-slate-900">
+                My Reports
+              </Link>
+              {user?.role === "admin" && (
+                <Link to="/admin" className="font-bold text-primary-600 hover:text-primary-800">
+                  Admin
+                </Link>
+              )}
               <span className="hidden text-xs font-semibold uppercase text-slate-400 sm:inline">
                 {user?.username}
               </span>

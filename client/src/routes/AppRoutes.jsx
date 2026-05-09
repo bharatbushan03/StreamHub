@@ -133,6 +133,28 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/my-reports"
+        element={
+          <ProtectedRoute>
+            <MyReports />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="/admin" element={<AdminRoute />}>
+        <Route element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="users/:userId" element={<AdminUserDetails />} />
+          <Route path="videos" element={<AdminVideos />} />
+          <Route path="videos/:videoId" element={<AdminVideoDetails />} />
+          <Route path="comments" element={<AdminComments />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="reports/:reportId" element={<AdminReportDetails />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
+        </Route>
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

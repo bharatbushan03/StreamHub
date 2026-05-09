@@ -1073,6 +1073,26 @@ export default function WatchVideo() {
         )}
       </main>
       <Footer />
+      <ReportModal 
+        isOpen={reportModal.isOpen} 
+        onClose={() => setReportModal({ ...reportModal, isOpen: false })}
+        targetType={reportModal.targetType}
+        targetId={reportModal.targetId}
+      />
+    </div>
+  );
+}
+   </div>
+
+            <RelatedVideos
+              videos={relatedVideos}
+              loading={relatedLoading}
+              error={relatedError}
+            />
+          </div>
+        )}
+      </main>
+      <Footer />
     </div>
   );
 }

@@ -170,7 +170,8 @@ const getAllPublicVideos = async (req, res, next) => {
     const query = {
       visibility: "public",
       status: "published",
-      isDeleted: false
+      isDeleted: false,
+      isBlocked: false
     };
     const bannedOwnerIds = await User.find({ isBanned: true }).distinct("_id");
 
@@ -237,13 +238,13 @@ const getVideoById = async (req, res, next) => {
       "username fullName avatar channelName subscribersCount totalVideos totalViews isBanned"
     );
 
-    if (!video || video.isDeleted) {
+    const isOwner = req.user && video?.owner?._id?.toString() === req.user._id.toString();
+    const isAdmin = req.user && req.user.role === "admin";
+
+    if (!video || video.isDeleted || (video.isBlocked && !isOwner && !isAdmin)) {
       res.status(404);
       throw new Error("Video not found");
     }
-
-    const isOwner = req.user && video.owner?._id?.toString() === req.user._id.toString();
-    const isAdmin = req.user && req.user.role === "admin";
 
     if (video.owner?.isBanned && !isOwner && !isAdmin) {
       res.status(404);

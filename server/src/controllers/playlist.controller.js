@@ -111,6 +111,10 @@ const canViewVideoInPlaylist = (video, user) => {
     return false;
   }
 
+  if (video.isBlocked && !isOwner && !isAdmin) {
+    return false;
+  }
+
   return true;
 };
 

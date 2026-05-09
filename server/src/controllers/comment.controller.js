@@ -112,7 +112,7 @@ const getVideoComments = async (req, res, next) => {
 
     const sort = sortBy === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
 
-    const query = { video: videoId, isDeleted: false };
+    const query = { video: videoId, isDeleted: false, isBlocked: false };
     const totalComments = await Comment.countDocuments(query);
     const comments = await Comment.find(query)
       .populate("user", "username fullName avatar")

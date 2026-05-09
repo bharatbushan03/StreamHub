@@ -212,7 +212,8 @@ const getChannelVideos = async (req, res, next) => {
       owner: channel._id,
       visibility: "public",
       status: "published",
-      isDeleted: false
+      isDeleted: false,
+      isBlocked: false
     };
 
     const totalVideos = await Video.countDocuments(query);
