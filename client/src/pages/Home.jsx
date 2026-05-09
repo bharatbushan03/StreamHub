@@ -16,7 +16,7 @@ const features = [
   },
   {
     title: "Community driven",
-    description: "Likes, comments, and playlists are planned for a full creator economy."
+    description: "Likes, dislikes, comments, and watch history are now part of the core flow."
   }
 ];
 
@@ -59,9 +59,6 @@ export default function Home() {
 
       <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-12">
         <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-10 shadow-sm">
-          <div className="absolute -right-24 -top-24 h-56 w-56 rounded-full bg-teal-200/70 blur-3xl" />
-          <div className="absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-orange-200/70 blur-3xl" />
-
           <div className="relative">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
               StreamHub
@@ -70,8 +67,8 @@ export default function Home() {
               Your video platform from beginner to pro
             </h1>
             <p className="mt-4 max-w-2xl text-base text-slate-600">
-              Build, learn, and scale a modern streaming product. Phase 3 adds
-              video uploads and public listings on top of the auth foundation.
+              Build, learn, and scale a modern streaming product. Phase 4 adds
+              reactions, comments, watch history, and resume playback.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link

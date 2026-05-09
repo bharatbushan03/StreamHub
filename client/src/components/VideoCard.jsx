@@ -25,10 +25,13 @@ export default function VideoCard({ video }) {
       <div className="p-4">
         <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
         <p className="mt-2 text-xs text-slate-500">
-          {video.owner?.username || "Creator"} · {video.views} views
+          {video.owner?.username || "Creator"} - {video.views} views
         </p>
         <p className="mt-2 text-xs text-slate-500">
-          {video.category} · {new Date(video.createdAt).toLocaleDateString()}
+          {video.likesCount || 0} likes - {video.commentsCount || 0} comments
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          {video.category} - {new Date(video.createdAt).toLocaleDateString()}
         </p>
       </div>
     </Link>

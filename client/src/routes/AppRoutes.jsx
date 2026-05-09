@@ -7,6 +7,7 @@ import Videos from "../pages/Videos";
 import WatchVideo from "../pages/WatchVideo";
 import UploadVideo from "../pages/UploadVideo";
 import MyVideos from "../pages/MyVideos";
+import WatchHistory from "../pages/WatchHistory";
 import NotFound from "../pages/NotFound";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -31,6 +32,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <MyVideos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <WatchHistory />
           </ProtectedRoute>
         }
       />

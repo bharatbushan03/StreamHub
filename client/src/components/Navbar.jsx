@@ -12,11 +12,11 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/" className="text-xl font-semibold tracking-tight text-slate-900">
           StreamHub
         </Link>
-        <div className="flex items-center gap-4 text-sm font-medium text-slate-600">
+        <div className="flex flex-wrap items-center justify-center gap-3 text-sm font-medium text-slate-600 sm:justify-end">
           <Link to="/" className="hover:text-slate-900">
             Home
           </Link>
@@ -30,6 +30,9 @@ export default function Navbar() {
               </Link>
               <Link to="/my-videos" className="hover:text-slate-900">
                 My Videos
+              </Link>
+              <Link to="/history" className="hover:text-slate-900">
+                History
               </Link>
               <Link to="/profile" className="hover:text-slate-900">
                 Profile

@@ -163,19 +163,24 @@ const getVideoById = async (req, res, next) => {
     }
 
     const isOwner = req.user && video.owner?._id?.toString() === req.user._id.toString();
+    const isAdmin = req.user && req.user.role === "admin";
 
-    if (video.visibility === "private" && !isOwner) {
+    if (video.visibility === "private" && !isOwner && !isAdmin) {
       res.status(403);
       throw new Error("This video is private");
     }
 
-    if (video.status !== "published" && !isOwner) {
+    if (video.status !== "published" && !isOwner && !isAdmin) {
       res.status(404);
       throw new Error("Video not available");
     }
 
-    video.views += 1;
-    await video.save();
+    try {
+      await Video.updateOne({ _id: video._id }, { $inc: { views: 1 } });
+      video.views += 1;
+    } catch (error) {
+      console.warn("View count update failed:", error.message);
+    }
 
     res.status(200).json({
       success: true,

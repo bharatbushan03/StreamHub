@@ -189,7 +189,10 @@ export default function MyVideos() {
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {video.visibility} · {video.status} · {video.views} views
+                    {video.visibility} - {video.status} - {video.views} views
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {video.likesCount || 0} likes - {video.dislikesCount || 0} dislikes - {video.commentsCount || 0} comments
                   </p>
                   <p className="mt-2 text-xs text-slate-500">
                     {new Date(video.createdAt).toLocaleDateString()}
