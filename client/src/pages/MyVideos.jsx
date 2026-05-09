@@ -189,12 +189,20 @@ export default function MyVideos() {
             <h1 className="text-2xl font-semibold text-slate-900">My videos</h1>
             <p className="text-sm text-slate-600">Manage the videos you have uploaded.</p>
           </div>
-          <Link
-            to="/creator-dashboard"
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-          >
-            Creator dashboard
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/creator-dashboard"
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Creator dashboard
+            </Link>
+            <Link
+              to="/creator-analytics"
+              className="rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              Creator analytics
+            </Link>
+          </div>
         </div>
 
         {loading && <div className="mt-10 text-sm text-slate-600">Loading your videos...</div>}
@@ -359,6 +367,12 @@ export default function MyVideos() {
                       Watch
                     </Link>
                   )}
+                  <Link
+                    to={`/videos/${video._id}/analytics`}
+                    className="rounded-full border border-slate-300 px-4 py-1 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  >
+                    Analytics
+                  </Link>
                   <button
                     type="button"
                     onClick={() => startEditing(video)}

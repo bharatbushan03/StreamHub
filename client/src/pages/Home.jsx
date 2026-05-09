@@ -1,30 +1,90 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import api from "../services/api";
-import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import FeatureCard from "../components/FeatureCard";
+import Navbar from "../components/Navbar";
+import VideoCard from "../components/VideoCard";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
+import { trackVideoEvent } from "../services/analyticsService";
+import { getHomeFeed } from "../services/recommendationService";
 
-const features = [
+const sectionConfig = [
   {
-    title: "Creator ready",
-    description: "Channels, subscriptions, playlists, and dashboard stats are now ready."
+    key: "recommended",
+    title: "Recommended for you",
+    empty: "Watch and like videos to help StreamHub tune this feed.",
+    source: "recommendation"
   },
   {
-    title: "Streaming focused",
-    description: "Built to grow into HLS streaming, transcoding, and multiple qualities."
+    key: "fromSubscriptions",
+    title: "From your subscriptions",
+    empty: "Subscribe to creators to see their latest videos here.",
+    source: "home"
   },
   {
-    title: "Community driven",
-    description: "Likes, comments, watch history, playlists, and subscriptions power discovery."
+    key: "trending",
+    title: "Trending now",
+    empty: "Trending videos will appear after creators publish more content.",
+    source: "trending"
+  },
+  {
+    key: "latest",
+    title: "Latest uploads",
+    empty: "No published uploads yet.",
+    source: "home"
   }
 ];
 
+function VideoSection({ title, videos, empty, source }) {
+  return (
+    <section className="mt-10">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+        {source === "trending" && (
+          <Link to="/trending" className="text-sm font-semibold text-teal-700 hover:text-teal-800">
+            View all
+          </Link>
+        )}
+      </div>
+
+      {videos.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white/80 px-4 py-6 text-sm text-slate-600">
+          {empty}
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {videos.map((video) => (
+            <VideoCard key={video._id} video={video} source={source} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  const trackedImpressionsRef = useRef(new Set());
   const [status, setStatus] = useState({
     state: "loading",
     message: "Checking backend status..."
   });
+  const [sections, setSections] = useState({
+    recommended: [],
+    trending: [],
+    latest: [],
+    fromSubscriptions: []
+  });
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState("");
+
+  const allFeedVideos = useMemo(
+    () =>
+      Object.values(sections)
+        .flat()
+        .filter(Boolean),
+    [sections]
+  );
 
   const checkHealth = async () => {
     setStatus({ state: "loading", message: "Checking backend status..." });
@@ -43,9 +103,44 @@ export default function Home() {
     }
   };
 
+  const fetchFeed = async () => {
+    setFeedLoading(true);
+    setFeedError("");
+
+    try {
+      const response = await getHomeFeed();
+      setSections(response.data?.sections || {
+        recommended: [],
+        trending: [],
+        latest: [],
+        fromSubscriptions: []
+      });
+    } catch (error) {
+      setFeedError(error?.response?.data?.message || "Unable to load your home feed.");
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
   useEffect(() => {
     checkHealth();
-  }, []);
+    fetchFeed();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    allFeedVideos.forEach((video) => {
+      if (!video?._id || trackedImpressionsRef.current.has(video._id)) {
+        return;
+      }
+
+      trackedImpressionsRef.current.add(video._id);
+      trackVideoEvent({
+        videoId: video._id,
+        eventType: "impression",
+        source: "home"
+      }).catch(() => {});
+    });
+  }, [allFeedVideos]);
 
   const statusStyles = {
     online: "border-emerald-200 bg-emerald-100 text-emerald-700",
@@ -57,45 +152,55 @@ export default function Home() {
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-12">
-        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-10 shadow-sm">
-          <div className="relative">
+      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10">
+        <section className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-700">
               StreamHub
             </p>
-            <h1 className="mt-4 text-4xl font-semibold text-slate-900 sm:text-5xl">
-              Your video platform from beginner to pro
+            <h1 className="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
+              Discover videos built around what you watch
             </h1>
-            <p className="mt-4 max-w-2xl text-base text-slate-600">
-              Build, learn, and scale a modern streaming product. Phase 5 adds
-              creator channels, playlists, subscriptions, and dashboard stats.
+            <p className="mt-3 max-w-2xl text-sm text-slate-600">
+              Search, trending scores, watch history, likes, subscriptions, and creator activity now
+              shape the first page you see.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                to="/videos"
-                className="rounded-full bg-teal-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
-              >
-                Explore Videos
-              </Link>
-              <Link
-                to="/playlists"
-                className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-              >
-                Browse Playlists
-              </Link>
-            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to="/search"
+              className="rounded-full bg-teal-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
+            >
+              Search Videos
+            </Link>
+            <Link
+              to="/trending"
+              className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Trending
+            </Link>
           </div>
         </section>
 
-        <section className="mt-10 grid gap-4 md:grid-cols-3">
-          {features.map((feature) => (
-            <FeatureCard
-              key={feature.title}
-              title={feature.title}
-              description={feature.description}
+        {feedLoading && <p className="mt-10 text-sm text-slate-600">Loading home feed...</p>}
+
+        {feedError && (
+          <div className="mt-10 rounded-lg border border-rose-200 bg-rose-100 px-4 py-3 text-sm text-rose-700">
+            {feedError}
+          </div>
+        )}
+
+        {!feedLoading &&
+          !feedError &&
+          sectionConfig.map((section) => (
+            <VideoSection
+              key={section.key}
+              title={section.title}
+              videos={sections[section.key] || []}
+              empty={section.empty}
+              source={section.source}
             />
           ))}
-        </section>
 
         <section className="mt-10 rounded-2xl border border-slate-200 bg-white/80 p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

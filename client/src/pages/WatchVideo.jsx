@@ -4,8 +4,10 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import HLSPlayer from "../components/HLSPlayer";
 import ProcessingProgress from "../components/ProcessingProgress";
+import RelatedVideos from "../components/RelatedVideos";
 import VideoStatusBadge from "../components/VideoStatusBadge";
 import api from "../services/api";
+import { trackVideoEvent } from "../services/analyticsService";
 import { getAssetUrl } from "../utils/url";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -34,9 +36,11 @@ import {
   subscribeToChannel,
   unsubscribeFromChannel
 } from "../services/subscriptionService";
+import { getRelatedVideos } from "../services/recommendationService";
 
 const COMMENT_LIMIT = 10;
 const HISTORY_SYNC_INTERVAL = 12000;
+const ANALYTICS_SYNC_INTERVAL = 20000;
 const MAX_COMMENT_LENGTH = 1000;
 
 const formatCount = (value) => Number(value || 0).toLocaleString();
@@ -53,6 +57,9 @@ export default function WatchVideo() {
   const { isAuthenticated, user } = useAuth();
   const playbackRef = useRef({ currentTime: 0, duration: 0 });
   const lastHistorySyncRef = useRef(0);
+  const lastAnalyticsSyncRef = useRef(0);
+  const lastAnalyticsPositionRef = useRef(0);
+  const trackedViewRef = useRef("");
 
   const [video, setVideo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,6 +95,10 @@ export default function WatchVideo() {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
+
+  const [relatedVideos, setRelatedVideos] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedError, setRelatedError] = useState("");
 
   const fetchVideo = async () => {
     setLoading(true);
@@ -168,8 +179,29 @@ export default function WatchVideo() {
 
   useEffect(() => {
     lastHistorySyncRef.current = 0;
+    lastAnalyticsSyncRef.current = 0;
+    lastAnalyticsPositionRef.current = 0;
+    trackedViewRef.current = "";
     fetchVideo();
     fetchComments(1, false);
+  }, [videoId]);
+
+  useEffect(() => {
+    const fetchRelated = async () => {
+      setRelatedLoading(true);
+      setRelatedError("");
+
+      try {
+        const response = await getRelatedVideos(videoId, { limit: 6 });
+        setRelatedVideos(response.data?.videos || []);
+      } catch (err) {
+        setRelatedError(err?.response?.data?.message || "Unable to load related videos.");
+      } finally {
+        setRelatedLoading(false);
+      }
+    };
+
+    fetchRelated();
   }, [videoId]);
 
   useEffect(() => {
@@ -225,6 +257,19 @@ export default function WatchVideo() {
     const timer = window.setInterval(pollStatus, 5000);
     return () => window.clearInterval(timer);
   }, [videoId, video?.status]);
+
+  useEffect(() => {
+    if (!video?._id || video.status !== "published" || trackedViewRef.current === video._id) {
+      return;
+    }
+
+    trackedViewRef.current = video._id;
+    trackVideoEvent({
+      videoId: video._id,
+      eventType: "view",
+      source: "direct"
+    }).catch(() => {});
+  }, [video?._id, video?.status]);
 
   const handleReaction = async (type) => {
     if (!isAuthenticated) {
@@ -527,20 +572,53 @@ export default function WatchVideo() {
     }
   };
 
+  const trackPlaybackAnalytics = (eventType, playback, completed = false) => {
+    if (!videoId) {
+      return;
+    }
+
+    const currentTime = Math.max(0, Math.floor(playback.currentTime || 0));
+    const lastPosition = Math.max(0, Math.floor(lastAnalyticsPositionRef.current || 0));
+    const watchDelta = Math.max(0, currentTime - lastPosition);
+
+    if (eventType === "watch_progress" && watchDelta < 5 && !completed) {
+      return;
+    }
+
+    lastAnalyticsPositionRef.current = currentTime;
+
+    trackVideoEvent({
+      videoId,
+      eventType,
+      watchTime: eventType === "watch_progress" ? watchDelta : 0,
+      watchPosition: currentTime,
+      completed,
+      source: "direct"
+    }).catch(() => {});
+  };
+
   const handlePlayerProgress = (playback) => {
     playbackRef.current = playback;
 
     if (playback.eventType === "pause") {
       syncWatchHistory(false, playback);
+      trackPlaybackAnalytics("watch_progress", playback, false);
       return;
     }
 
     if (playback.eventType === "ended") {
       syncWatchHistory(true, playback);
+      trackPlaybackAnalytics("watch_progress", playback, true);
+      trackPlaybackAnalytics("complete", playback, true);
       return;
     }
 
     const now = Date.now();
+    if (now - lastAnalyticsSyncRef.current >= ANALYTICS_SYNC_INTERVAL) {
+      lastAnalyticsSyncRef.current = now;
+      trackPlaybackAnalytics("watch_progress", playback, false);
+    }
+
     if (now - lastHistorySyncRef.current < HISTORY_SYNC_INTERVAL) {
       return;
     }
@@ -985,6 +1063,12 @@ export default function WatchVideo() {
                 </button>
               )}
             </div>
+
+            <RelatedVideos
+              videos={relatedVideos}
+              loading={relatedLoading}
+              error={relatedError}
+            />
           </div>
         )}
       </main>

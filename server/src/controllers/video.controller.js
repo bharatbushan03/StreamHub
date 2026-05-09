@@ -7,6 +7,7 @@ const {
   resolveUploadPath,
   startVideoProcessing
 } = require("../services/videoProcessing.service");
+const { generateSearchKeywords } = require("../utils/searchKeywords");
 
 const VISIBILITY_VALUES = new Set(["public", "private", "unlisted"]);
 
@@ -75,6 +76,15 @@ const buildVideoResponse = (video) => ({
   format: video.format,
   resolution: video.resolution,
   views: video.views,
+  searchKeywords: video.searchKeywords,
+  trendingScore: video.trendingScore,
+  engagementScore: video.engagementScore,
+  averageWatchTime: video.averageWatchTime,
+  totalWatchTime: video.totalWatchTime,
+  uniqueViewers: video.uniqueViewers,
+  impressions: video.impressions,
+  clickThroughRate: video.clickThroughRate,
+  lastViewedAt: video.lastViewedAt,
   likesCount: video.likesCount,
   dislikesCount: video.dislikesCount,
   commentsCount: video.commentsCount,
@@ -127,6 +137,10 @@ const uploadVideo = async (req, res, next) => {
       videoFile: `/uploads/originals/${videoFile.filename}`,
       thumbnail: thumbnailFile ? `/uploads/thumbnails/${thumbnailFile.filename}` : "",
       fileSize: videoFile.size,
+      searchKeywords: generateSearchKeywords(
+        { title, description, category, tags },
+        req.user
+      ),
       status: "processing",
       processingProgress: 0,
       processingError: ""
@@ -158,11 +172,19 @@ const getAllPublicVideos = async (req, res, next) => {
       status: "published",
       isDeleted: false
     };
+    const bannedOwnerIds = await User.find({ isBanned: true }).distinct("_id");
+
+    if (bannedOwnerIds.length > 0) {
+      query.owner = { $nin: bannedOwnerIds };
+    }
 
     if (search) {
       query.$or = [
         { title: { $regex: escapeRegex(search), $options: "i" } },
-        { description: { $regex: escapeRegex(search), $options: "i" } }
+        { description: { $regex: escapeRegex(search), $options: "i" } },
+        { category: { $regex: escapeRegex(search), $options: "i" } },
+        { tags: { $regex: escapeRegex(search), $options: "i" } },
+        { searchKeywords: { $regex: escapeRegex(search), $options: "i" } }
       ];
     }
 
@@ -212,7 +234,7 @@ const getVideoById = async (req, res, next) => {
 
     const video = await Video.findById(videoId).populate(
       "owner",
-      "username fullName avatar channelName subscribersCount totalVideos totalViews"
+      "username fullName avatar channelName subscribersCount totalVideos totalViews isBanned"
     );
 
     if (!video || video.isDeleted) {
@@ -223,6 +245,11 @@ const getVideoById = async (req, res, next) => {
     const isOwner = req.user && video.owner?._id?.toString() === req.user._id.toString();
     const isAdmin = req.user && req.user.role === "admin";
 
+    if (video.owner?.isBanned && !isOwner && !isAdmin) {
+      res.status(404);
+      throw new Error("Video not found");
+    }
+
     if (video.visibility === "private" && !isOwner && !isAdmin) {
       res.status(403);
       throw new Error("This video is private");
@@ -230,8 +257,16 @@ const getVideoById = async (req, res, next) => {
 
     if (video.status === "published") {
       try {
-        await Video.updateOne({ _id: video._id }, { $inc: { views: 1 } });
+        await Video.updateOne(
+          { _id: video._id },
+          {
+            $inc: { views: 1 },
+            $set: { lastViewedAt: new Date() }
+          }
+        );
+        await User.updateOne({ _id: video.owner._id || video.owner }, { $inc: { totalViews: 1 } });
         video.views += 1;
+        video.lastViewedAt = new Date();
       } catch (error) {
         console.warn("View count update failed:", error.message);
       }
@@ -257,7 +292,7 @@ const getVideoStatus = async (req, res, next) => {
 
     const video = await Video.findById(videoId).populate(
       "owner",
-      "username fullName avatar channelName subscribersCount totalVideos totalViews"
+      "username fullName avatar channelName subscribersCount totalVideos totalViews isBanned"
     );
 
     if (!video || video.isDeleted) {
@@ -267,6 +302,11 @@ const getVideoStatus = async (req, res, next) => {
 
     const isOwner = req.user && video.owner?._id?.toString() === req.user._id.toString();
     const isAdmin = req.user && req.user.role === "admin";
+
+    if (video.owner?.isBanned && !isOwner && !isAdmin) {
+      res.status(404);
+      throw new Error("Video not found");
+    }
 
     if (video.visibility === "private" && !isOwner && !isAdmin) {
       res.status(403);
@@ -424,6 +464,8 @@ const updateVideoDetails = async (req, res, next) => {
         video[key] = updates[key];
       }
     });
+
+    video.searchKeywords = generateSearchKeywords(video, req.user);
 
     await video.save();
 

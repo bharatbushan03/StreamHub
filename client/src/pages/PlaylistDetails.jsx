@@ -8,6 +8,7 @@ import {
   removeVideoFromPlaylist,
   reorderPlaylistVideos
 } from "../services/playlistService";
+import { trackVideoEvent } from "../services/analyticsService";
 import { getAssetUrl } from "../utils/url";
 
 const getEntityId = (entity) => {
@@ -99,6 +100,14 @@ export default function PlaylistDetails() {
     }
   };
 
+  const handleVideoClick = (videoId) => {
+    trackVideoEvent({
+      videoId,
+      eventType: "click",
+      source: "playlist"
+    }).catch(() => {});
+  };
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -181,6 +190,7 @@ export default function PlaylistDetails() {
                     <div className="flex flex-col gap-4 sm:flex-row">
                       <Link
                         to={`/watch/${video._id}`}
+                        onClick={() => handleVideoClick(video._id)}
                         className="aspect-video w-full overflow-hidden rounded-lg bg-slate-100 sm:w-52"
                       >
                         {video.thumbnail ? (
@@ -198,6 +208,7 @@ export default function PlaylistDetails() {
                       <div className="flex-1">
                         <Link
                           to={`/watch/${video._id}`}
+                          onClick={() => handleVideoClick(video._id)}
                           className="text-base font-semibold text-slate-900 hover:text-teal-700"
                         >
                           {video.title}

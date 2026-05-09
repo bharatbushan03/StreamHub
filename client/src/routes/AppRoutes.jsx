@@ -4,6 +4,8 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Profile from "../pages/Profile";
 import Videos from "../pages/Videos";
+import Search from "../pages/Search";
+import Trending from "../pages/Trending";
 import WatchVideo from "../pages/WatchVideo";
 import UploadVideo from "../pages/UploadVideo";
 import MyVideos from "../pages/MyVideos";
@@ -16,6 +18,9 @@ import Subscriptions from "../pages/Subscriptions";
 import Channel from "../pages/Channel";
 import EditChannel from "../pages/EditChannel";
 import CreatorDashboard from "../pages/CreatorDashboard";
+import CreatorAnalytics from "../pages/CreatorAnalytics";
+import SearchHistory from "../pages/SearchHistory";
+import VideoAnalytics from "../pages/VideoAnalytics";
 import NotFound from "../pages/NotFound";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -24,6 +29,8 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/videos" element={<Videos />} />
+      <Route path="/search" element={<Search />} />
+      <Route path="/trending" element={<Trending />} />
       <Route path="/watch/:videoId" element={<WatchVideo />} />
       <Route path="/playlists" element={<Playlists />} />
       <Route path="/playlists/:playlistId" element={<PlaylistDetails />} />
@@ -83,6 +90,30 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <CreatorDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator-analytics"
+        element={
+          <ProtectedRoute>
+            <CreatorAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/videos/:videoId/analytics"
+        element={
+          <ProtectedRoute>
+            <VideoAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/search-history"
+        element={
+          <ProtectedRoute>
+            <SearchHistory />
           </ProtectedRoute>
         }
       />

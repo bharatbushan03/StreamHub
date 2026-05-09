@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/user.model");
 const Video = require("../models/video.model");
+const { generateSearchKeywords } = require("../utils/searchKeywords");
 
 const SORT_OPTIONS = {
   latest: { createdAt: -1 },
@@ -174,6 +175,18 @@ const updateMyChannel = async (req, res, next) => {
     }
 
     const user = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { new: true });
+
+    const videos = await Video.find({ owner: user._id, isDeleted: false }).select(
+      "title description category tags searchKeywords"
+    );
+    await Promise.all(
+      videos.map((video) =>
+        Video.updateOne(
+          { _id: video._id },
+          { $set: { searchKeywords: generateSearchKeywords(video, user) } }
+        )
+      )
+    );
 
     res.status(200).json({
       success: true,

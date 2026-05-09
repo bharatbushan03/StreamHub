@@ -142,7 +142,7 @@ export default function Videos() {
         {!loading && !error && videos.length > 0 && (
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {videos.map((video) => (
-              <VideoCard key={video._id} video={video} />
+              <VideoCard key={video._id} video={video} source={filters.search ? "search" : "direct"} />
             ))}
           </div>
         )}

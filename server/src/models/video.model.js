@@ -100,6 +100,41 @@ const videoSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    searchKeywords: {
+      type: [String],
+      default: []
+    },
+    trendingScore: {
+      type: Number,
+      default: 0
+    },
+    engagementScore: {
+      type: Number,
+      default: 0
+    },
+    averageWatchTime: {
+      type: Number,
+      default: 0
+    },
+    totalWatchTime: {
+      type: Number,
+      default: 0
+    },
+    uniqueViewers: {
+      type: Number,
+      default: 0
+    },
+    impressions: {
+      type: Number,
+      default: 0
+    },
+    clickThroughRate: {
+      type: Number,
+      default: 0
+    },
+    lastViewedAt: {
+      type: Date
+    },
     likesCount: {
       type: Number,
       default: 0
@@ -138,5 +173,10 @@ const videoSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+videoSchema.index({ searchKeywords: 1 });
+videoSchema.index({ visibility: 1, status: 1, isDeleted: 1, createdAt: -1 });
+videoSchema.index({ trendingScore: -1 });
+videoSchema.index({ owner: 1, isDeleted: 1, status: 1 });
 
 module.exports = mongoose.model("Video", videoSchema);

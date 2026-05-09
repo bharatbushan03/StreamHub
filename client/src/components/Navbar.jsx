@@ -23,6 +23,12 @@ export default function Navbar() {
           <Link to="/videos" className="hover:text-slate-900">
             Videos
           </Link>
+          <Link to="/search" className="hover:text-slate-900">
+            Search
+          </Link>
+          <Link to="/trending" className="hover:text-slate-900">
+            Trending
+          </Link>
           <Link to="/playlists" className="hover:text-slate-900">
             Playlists
           </Link>
@@ -43,8 +49,14 @@ export default function Navbar() {
               <Link to="/history" className="hover:text-slate-900">
                 History
               </Link>
+              <Link to="/search-history" className="hover:text-slate-900">
+                Search History
+              </Link>
               <Link to="/creator-dashboard" className="hover:text-slate-900">
                 Dashboard
+              </Link>
+              <Link to="/creator-analytics" className="hover:text-slate-900">
+                Analytics
               </Link>
               <Link to="/profile" className="hover:text-slate-900">
                 Profile

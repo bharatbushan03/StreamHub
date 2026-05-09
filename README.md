@@ -1,86 +1,30 @@
 # StreamHub
 
-StreamHub is a beginner-to-advanced video streaming platform built with React, Express, and MongoDB. Phase 6 is complete and upgrades playback from direct MP4 video to FFmpeg-powered HLS adaptive streaming with local processing.
+StreamHub is a production-minded video streaming app built with React, Express, MongoDB, JWT auth, local uploads, FFmpeg video processing, HLS playback, creator channels, playlists, subscriptions, engagement, and discovery.
+
+## Current Completed Phase
+
+Phase 7 is complete: Advanced Search, Recommendations, Trending Videos, and Analytics.
+
+Included in Phase 7:
+
+- Advanced video search with query, category, tags, creator, duration, upload date, sorting, and pagination.
+- Search suggestions from public published videos, tags, categories, and creator/channel names.
+- Logged-in user search history with delete one and clear all.
+- Personalized home feed using watch history, liked videos, tags, categories, subscriptions, recent uploads, and trending score.
+- Related videos on the watch page.
+- Trending videos with a simple explainable score.
+- Video analytics event tracking for impressions, clicks, views, watch progress, and completions.
+- Creator analytics and single video analytics pages.
+
+Not included yet: admin dashboard, cloud storage, payments, real-time notifications, Redis, Docker, or ML recommendations.
 
 ## Tech Stack
 
 - Frontend: React with Vite, Tailwind CSS, React Router DOM, Axios, hls.js
 - Backend: Node.js, Express, MongoDB with Mongoose, JWT auth, Multer, fluent-ffmpeg
-- Local processing helpers: ffmpeg-static, ffprobe-static
-- Storage in this phase: local files under `server/uploads`
-
-## Current Completed Phase
-
-Phase 6: FFmpeg Video Processing and HLS Adaptive Streaming
-
-- Original videos are stored locally.
-- Uploaded videos enter `processing` status.
-- FFprobe extracts duration, format, file size, and resolution.
-- FFmpeg generates a thumbnail when one is not uploaded.
-- FFmpeg creates HLS variants without upscaling above source resolution.
-- A master HLS playlist is generated for adaptive playback.
-- Watch page uses an HLS player with hls.js fallback.
-- My Videos shows processing status, progress, qualities, and retry controls.
-- Failed or uploaded videos can be retried by owner/admin.
-
-Phase 6 does not include recommendations, admin dashboard, payments, real-time notifications, cloud storage, Redis, or external queues.
-
-## FFmpeg Requirement
-
-This repo installs `ffmpeg-static` and `ffprobe-static`, so the backend can usually process videos without a system FFmpeg install.
-
-For Windows system FFmpeg setup:
-
-1. Download FFmpeg from `https://www.gyan.dev/ffmpeg/builds/` or the official FFmpeg site.
-2. Extract it, for example to `C:\ffmpeg`.
-3. Add `C:\ffmpeg\bin` to your Windows `PATH`.
-4. Restart the terminal.
-5. Verify:
-
-```bash
-ffmpeg -version
-ffprobe -version
-```
-
-Optional environment overrides:
-
-```env
-FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
-FFPROBE_PATH=C:\ffmpeg\bin\ffprobe.exe
-```
-
-If FFmpeg or FFprobe is missing, the upload still creates a video record, then processing fails gracefully with a readable `processingError`.
-
-## Upload Folder Structure
-
-```text
-server/uploads/
-  originals/
-  videos/
-  thumbnails/
-  hls/
-    videoId/
-      master.m3u8
-      144p/
-        index.m3u8
-        segment001.ts
-      240p/
-      360p/
-      480p/
-      720p/
-      1080p/
-```
-
-`videos/` remains for compatibility, while new uploads are stored in `originals/`.
-
-## Video Status Workflow
-
-- `uploaded`: video exists but processing has not started or is ready to retry.
-- `processing`: FFmpeg is extracting metadata, generating thumbnail, and creating HLS.
-- `published`: HLS files are ready and the video is playable.
-- `failed`: processing failed; owner/admin can retry.
-
-The frontend polls `/api/videos/:videoId/status` every 5 seconds while a video is uploaded or processing.
+- Storage: local files under `server/uploads`
+- Recommendation approach: rule-based ranking, no ML model yet
 
 ## Environment Variables
 
@@ -120,174 +64,220 @@ npm install
 npm run dev
 ```
 
-## Backend Additions
+## FFmpeg Requirement
 
-New service:
+Phase 6 added FFmpeg and HLS processing. The repo includes `ffmpeg-static` and `ffprobe-static`, but a system install also works.
 
-- `server/src/services/videoProcessing.service.js`
-  - Checks FFmpeg/FFprobe availability.
-  - Extracts metadata.
-  - Generates thumbnails.
-  - Creates HLS variants.
-  - Writes `master.m3u8`.
-  - Updates video status, progress, and errors.
+Windows check:
 
-Updated model:
-
-- `server/src/models/video.model.js`
-  - `originalFile`
-  - `hlsUrl`
-  - `masterPlaylistUrl`
-  - `qualities`
-  - `processingProgress`
-  - `processingError`
-  - `fileSize`
-  - `format`
-  - `resolution`
-  - `status: uploaded | processing | published | failed`
-
-Updated middleware:
-
-- Uploads now store original videos in `server/uploads/originals`.
-- HLS static files use correct MIME types for `.m3u8` and `.ts`.
-- Private HLS file access is guarded by JWT for HLS requests.
-
-## API Routes
-
-Video processing:
-
-- `GET /api/videos/:videoId/status`
-- `POST /api/videos/:videoId/retry-processing`
-
-Existing video routes still apply:
-
-- `POST /api/videos/upload`
-- `GET /api/videos`
-- `GET /api/videos/my-videos`
-- `GET /api/videos/:videoId`
-- `PATCH /api/videos/:videoId`
-- `DELETE /api/videos/:videoId`
-
-Upload response now returns a processing video:
-
-```json
-{
-  "success": true,
-  "message": "Video uploaded successfully and is being processed",
-  "video": {
-    "_id": "...",
-    "status": "processing",
-    "processingProgress": 0
-  }
-}
+```bash
+ffmpeg -version
+ffprobe -version
 ```
 
-## Frontend Additions
+Optional overrides:
 
-New components:
+```env
+FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
+FFPROBE_PATH=C:\ffmpeg\bin\ffprobe.exe
+```
 
-- `client/src/components/HLSPlayer.jsx`
-- `client/src/components/VideoStatusBadge.jsx`
-- `client/src/components/ProcessingProgress.jsx`
+## New Backend Models
+
+- `server/src/models/videoAnalytics.model.js`
+  - Tracks `impression`, `click`, `view`, `watch_progress`, `complete`, `like`, `dislike`, `comment`, and `share` events.
+  - Supports guest events with `viewer: null`.
+  - Stores watch time, position, device, browser, country, and traffic source.
+
+- `server/src/models/searchHistory.model.js`
+  - Stores logged-in user searches, filters, result count, and created date.
+
+Updated:
+
+- `server/src/models/video.model.js`
+  - Added `searchKeywords`, `trendingScore`, `engagementScore`, `averageWatchTime`, `totalWatchTime`, `uniqueViewers`, `impressions`, `clickThroughRate`, and `lastViewedAt`.
+
+## New Backend Controllers
+
+- `server/src/controllers/search.controller.js`
+- `server/src/controllers/recommendation.controller.js`
+- `server/src/controllers/analytics.controller.js`
+
+New helper:
+
+- `server/src/utils/searchKeywords.js`
+  - Generates lowercase search keywords from video title, description, category, tags, owner username, owner full name, and channel name.
+
+## New API Routes
+
+Search:
+
+- `GET /api/search/videos`
+- `GET /api/search/suggestions`
+- `GET /api/search/history`
+- `DELETE /api/search/history/:historyId`
+- `DELETE /api/search/history`
+
+Recommendations:
+
+- `GET /api/recommendations/home`
+- `GET /api/recommendations/videos`
+- `GET /api/recommendations/related/:videoId`
+- `GET /api/recommendations/trending`
+- `GET /api/recommendations/subscriptions`
+
+Analytics:
+
+- `POST /api/analytics/video-event`
+- `GET /api/analytics/videos/:videoId`
+- `GET /api/analytics/creator`
+
+All public feeds return only non-deleted, public, published videos.
+
+## New Frontend Pages
+
+- `client/src/pages/Search.jsx`
+- `client/src/pages/Trending.jsx`
+- `client/src/pages/SearchHistory.jsx`
+- `client/src/pages/CreatorAnalytics.jsx`
+- `client/src/pages/VideoAnalytics.jsx`
 
 Updated pages:
 
-- `WatchVideo.jsx`
-  - Shows processing UI while FFmpeg runs.
-  - Polls video status.
-  - Uses HLS playback when published.
-  - Shows retry button to owner/admin when failed.
-- `UploadVideo.jsx`
-  - Explains that processing starts after upload.
-- `MyVideos.jsx`
-  - Shows status badges, progress, qualities, duration, and retry controls.
+- `Home.jsx`: personalized feed sections.
+- `WatchVideo.jsx`: related videos and throttled analytics tracking.
+- `MyVideos.jsx`: links to creator analytics and per-video analytics.
+- `Videos.jsx`, `Channel.jsx`, `PlaylistDetails.jsx`: click source tracking.
 
-## How to Upload and Process a Video
+## New Frontend Components
 
-1. Start backend and frontend.
-2. Log in.
-3. Open `/upload`.
-4. Upload an MP4, MOV, MKV, or WebM file.
-5. Open `/my-videos`.
-6. Watch the status move from `processing` to `published`.
-7. Open the published video.
+- `client/src/components/SearchFilters.jsx`
+- `client/src/components/SearchSuggestions.jsx`
+- `client/src/components/AnalyticsCard.jsx`
+- `client/src/components/RelatedVideos.jsx`
+- Updated `VideoCard.jsx` to support click source tracking, duration display, and optional status.
 
-## How to Verify Generated HLS Files
+## New Frontend Services
 
-After processing completes, check:
+- `client/src/services/searchService.js`
+- `client/src/services/recommendationService.js`
+- `client/src/services/analyticsService.js`
+
+## How Recommendation Works
+
+For logged-out users:
+
+- Home feed mixes trending, latest, and popular public published videos.
+
+For logged-in users:
+
+- Uses watch history categories and tags.
+- Uses liked video categories and tags.
+- Uses subscribed creators.
+- Boosts recent and high-engagement videos.
+- Penalizes videos already completed.
+- Limits too many videos from the same creator.
+
+This is intentionally rule-based and explainable. No ML model is used yet.
+
+## How Trending Score Works
+
+Trending is calculated with:
 
 ```text
-server/uploads/hls/<videoId>/master.m3u8
-server/uploads/hls/<videoId>/<quality>/index.m3u8
-server/uploads/hls/<videoId>/<quality>/segment001.ts
+views * 1
++ likesCount * 3
++ commentsCount * 2
++ recentBoost
+- dislikesCount * 2
 ```
 
-Open the video document in MongoDB and confirm:
+Recent boost is highest for videos uploaded in the last 24 hours, then gradually drops for older uploads.
 
-- `status` is `published`
-- `masterPlaylistUrl` points to `/uploads/hls/<videoId>/master.m3u8`
-- `qualities` contains generated variants
-- `duration`, `format`, `fileSize`, and `resolution` are populated
+## How Analytics Tracking Works
 
-## How to Test HLS Playback
+Frontend sends events without blocking playback:
 
-1. Upload and wait for a video to become `published`.
-2. Open `/watch/:videoId`.
-3. Confirm the player loads from `masterPlaylistUrl`.
-4. Refresh the page and confirm watch history resume still works.
-5. Try Chrome/Edge/Firefox to exercise hls.js.
-6. Try Safari to exercise native HLS support.
+- Home, search, and trending pages track impressions.
+- Video cards track clicks.
+- Watch page tracks view on open.
+- HLS player progress sends watch progress every 20 seconds.
+- Pause and ended events flush progress.
+- Ended also sends a completion event.
 
-## How to Retry Failed Processing
+Backend updates video analytics summary fields safely and ignores very recent duplicate user events for impression/click/view.
 
-From frontend:
+## How to Test Advanced Search
 
-1. Open `/my-videos`.
-2. Find a video with `failed` status.
-3. Click `Retry Processing`.
+1. Start backend and frontend.
+2. Upload and publish several public videos with categories and tags.
+3. Open `/search`.
+4. Search by title, category, tag, creator username, or channel name.
+5. Try filters: duration, upload date, and sort order.
+6. Confirm private, deleted, failed, and processing videos do not appear.
 
-From API:
+## How to Test Search Suggestions
 
-```http
-POST http://localhost:5000/api/videos/<videoId>/retry-processing
-Authorization: Bearer <accessToken>
-```
+1. Open `/search`.
+2. Type at least two characters.
+3. Confirm suggestions appear.
+4. Click a suggestion and confirm it runs a search.
 
-Only the video owner or an admin can retry.
+## How to Test Recommendations
 
-## Debugging FFmpeg Errors
+1. Log in.
+2. Watch videos in a category.
+3. Like videos with tags.
+4. Subscribe to a creator.
+5. Return to `/` and check the recommended and subscription sections.
 
-- Run `ffmpeg -version` and `ffprobe -version`.
-- Check the video's `processingError` field.
-- Confirm the original file exists in `server/uploads/originals`.
-- Confirm disk space is available.
-- Try a known-good MP4 file.
-- If a video has no video stream, processing will fail.
-- If thumbnail generation fails, processing continues and stores a warning.
-- If HLS segment generation fails, the video status becomes `failed`.
+## How to Test Related Videos
+
+1. Open `/watch/:videoId`.
+2. Confirm related videos appear below comments.
+3. Related videos should favor same category, similar tags, same creator, and high engagement.
+
+## How to Test Trending Videos
+
+1. Open `/trending`.
+2. Switch between Today, This week, and This month.
+3. Add likes/comments/views to videos and reload.
+4. Confirm public published videos rank higher with stronger engagement.
+
+## How to Test Analytics Events
+
+1. Open the home page, search page, or trending page.
+2. Click a video card.
+3. Watch at least 20 seconds.
+4. Pause and finish the video.
+5. Open `/videos/:videoId/analytics` as the video owner.
+6. Confirm events, watch time, traffic sources, impressions, and completion rate update.
+
+## How to Test Creator Analytics
+
+1. Log in as a creator.
+2. Open `/creator-analytics`.
+3. Confirm total videos, views, likes, comments, watch time, top videos, traffic sources, and recent performance.
+4. Open a specific video analytics page from My Videos or Creator Analytics.
 
 ## Common Errors and Fixes
 
-- `FFMPEG is not available`: install FFmpeg or use `ffmpeg-static`.
-- `FFPROBE is not available`: install FFprobe or use `ffprobe-static`.
-- `Original video file is missing`: re-upload or restore the original file.
-- `No video stream found in uploaded file`: upload a real video file.
-- `Video resolution could not be detected`: the file may be corrupted.
-- `HLS playback failed`: check that `master.m3u8`, quality playlists, and segments exist.
-- `Video source unavailable`: the video is published but has no HLS or fallback file path.
-- `Video processing is already running`: wait for the current processing attempt.
-- `Only failed or uploaded videos can be retried`: published videos do not need retry.
-- `This video is private`: only the owner/admin can view private video metadata.
+- `Invalid sort option`: use one of `relevance`, `latest`, `oldest`, `views`, `likes`, `duration`, or `trending`.
+- `Invalid video ID`: check the route parameter is a MongoDB ObjectId.
+- `Video not found`: the video may be private, deleted, failed, processing, or owned by another user.
+- `Unable to load home feed`: confirm backend is running and MongoDB is connected.
+- `Search history item not found`: the item was deleted or belongs to a different user.
+- `You cannot view analytics for this video`: only video owner or admin can view video analytics.
+- No recommendations: create more watch history, likes, subscriptions, or public published videos.
+- No analytics data: open a video through home/search/trending and watch long enough for events to send.
+- HLS playback issues: verify FFmpeg processing completed and `master.m3u8` exists.
 
 ## Verification
 
-Backend checks:
+Backend load check:
 
 ```bash
-cd server
-node --check src/services/videoProcessing.service.js
-node --check src/controllers/video.controller.js
-node --check src/middleware/hlsAccess.middleware.js
+node -e "require('./server/src/app'); console.log('server app loaded')"
 ```
 
 Frontend build:
@@ -299,4 +289,4 @@ npm run build
 
 ## Next Phase Placeholder
 
-Phase 7 can add scalable media infrastructure: cloud object storage, CDN delivery, a Redis-backed processing queue, and stronger private media delivery. Those are intentionally not included in Phase 6.
+Phase 8 can add the admin dashboard and moderation system: reported content, user controls, creator moderation, platform metrics, and admin-only management screens.
