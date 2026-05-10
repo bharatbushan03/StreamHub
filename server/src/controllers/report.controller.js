@@ -2,6 +2,7 @@ const Report = require("../models/report.model");
 const Video = require("../models/video.model");
 const Comment = require("../models/comment.model");
 const User = require("../models/user.model");
+const { createNotification } = require("../services/notification.service");
 
 const createReport = async (req, res, next) => {
   try {
@@ -215,13 +216,25 @@ const resolveReport = async (req, res, next) => {
 
     // Apply action based on targetType
     if (action === "block_video" && report.targetType === "video") {
-      await Video.findByIdAndUpdate(report.targetId, {
+      const blockedVideo = await Video.findByIdAndUpdate(report.targetId, {
         isBlocked: true,
         moderationStatus: "blocked",
         blockedReason: adminNote || "Blocked due to user report",
         blockedAt: new Date(),
         blockedBy: req.user._id
       });
+      if (blockedVideo) {
+        await createNotification({
+          recipient: blockedVideo.owner,
+          sender: req.user._id,
+          type: "video_blocked",
+          title: "Video blocked",
+          message: `Your video "${blockedVideo.title}" was blocked after review.`,
+          link: "/my-videos",
+          entityType: "video",
+          entityId: blockedVideo._id
+        });
+      }
     } else if (action === "delete_video" && report.targetType === "video") {
       const vid = await Video.findByIdAndUpdate(report.targetId, {
         isDeleted: true,
@@ -264,9 +277,33 @@ const resolveReport = async (req, res, next) => {
            u.bannedBy = req.user._id;
            u.refreshToken = "";
            await u.save();
+           await createNotification({
+             recipient: u._id,
+             sender: req.user._id,
+             type: "account_banned",
+             title: "Account banned",
+             message: `Your account has been banned. Reason: ${u.banReason}`,
+             link: "/profile",
+             entityType: "user",
+             entityId: u._id
+           });
          }
        }
     }
+
+    await createNotification({
+      recipient: report.reporter,
+      sender: req.user._id,
+      type: "report_resolved",
+      title: "Report resolved",
+      message: "Your report has been reviewed and resolved.",
+      link: "/my-reports",
+      entityType: "report",
+      entityId: report._id,
+      metadata: {
+        action: action || ""
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -302,6 +339,17 @@ const rejectReport = async (req, res, next) => {
 
     // Reset video moderationStatus if it was under_review, maybe? 
     // We'll leave it simple for now, rejecting a report doesn't change target status.
+
+    await createNotification({
+      recipient: report.reporter,
+      sender: req.user._id,
+      type: "report_rejected",
+      title: "Report rejected",
+      message: "Your report was reviewed and rejected.",
+      link: "/my-reports",
+      entityType: "report",
+      entityId: report._id
+    });
 
     res.status(200).json({
       success: true,

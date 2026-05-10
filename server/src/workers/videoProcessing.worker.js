@@ -7,10 +7,15 @@ const { connectDB, disconnectDB } = require("../config/db");
 const redisConnection = require("../config/redis");
 const { logger } = require("../utils/logger");
 const Video = require("../models/video.model");
+const Subscription = require("../models/subscription.model");
+const User = require("../models/user.model");
 const storageProvider = require("../services/storage/storageProvider");
 const { downloadFromS3 } = require("../services/storage/downloadFile.service");
 const { uploadDirectory } = require("../services/storage/uploadDirectory.service");
 const { getThumbnailKey, getHlsBaseKey, getMasterPlaylistKey } = require("../utils/storageKeys");
+const { createNotification, sendBulkNotifications } = require("../services/notification.service");
+const { createActivity } = require("../services/activity.service");
+const { emitToUser } = require("../socket/socket");
 const {
   getVideoMetadata,
   generateThumbnail,
@@ -21,6 +26,21 @@ const {
 
 const TEMP_DIR = path.join(__dirname, "../../uploads/temp/processing");
 const workerConcurrency = Number(process.env.VIDEO_PROCESSING_CONCURRENCY) || 1;
+
+const emitProcessingStatus = (video) => {
+  if (!video?.owner) {
+    return;
+  }
+
+  emitToUser(video.owner, "video:processing_status", {
+    videoId: video._id,
+    status: video.status,
+    processingProgress: video.processingProgress || 0,
+    processingError: video.processingError || "",
+    processingJobId: video.processingJobId,
+    updatedAt: new Date()
+  });
+};
 
 const connectWorkerDb = async () => {
   if (mongoose.connection.readyState === 0) {
@@ -58,6 +78,7 @@ const processVideoJob = async (job) => {
     video.processingProgress = progress;
     await video.save();
     await job.updateProgress(progress).catch(() => {});
+    emitProcessingStatus(video);
   };
 
   try {
@@ -161,6 +182,50 @@ const processVideoJob = async (job) => {
     video.processingError = "";
     await updateProgress(100);
 
+    await createNotification({
+      recipient: video.owner,
+      type: "processing_completed",
+      title: "Video processing complete",
+      message: `Your video "${video.title}" is ready to watch.`,
+      link: `/watch/${video._id}`,
+      entityType: "video",
+      entityId: video._id,
+      metadata: {
+        processingJobId: job.id
+      }
+    });
+
+    if (video.visibility === "public" && !video.isBlocked) {
+      const creator = await User.findById(video.owner).select("username fullName channelName isBanned");
+      if (creator?.isBanned) {
+        logger.warn(`Skipped new upload fan-out because creator is banned: ${video.owner}`);
+      } else {
+        const creatorName = creator?.channelName || creator?.fullName || creator?.username || "A creator";
+        const subscriberIds = await Subscription.find({ channel: video.owner }).distinct("subscriber");
+        await sendBulkNotifications(subscriberIds, {
+          sender: video.owner,
+          type: "new_upload",
+          title: "New video uploaded",
+          message: `${creatorName} uploaded a new video: ${video.title}`,
+          link: `/watch/${video._id}`,
+          entityType: "video",
+          entityId: video._id,
+          metadata: {
+            videoTitle: video.title
+          }
+        });
+
+        await createActivity({
+          actor: video.owner,
+          type: "uploaded_video",
+          targetType: "video",
+          targetId: video._id,
+          message: `Uploaded a new video: ${video.title}.`,
+          visibility: "public"
+        });
+      }
+    }
+
     logger.info(`Finished processing video: ${videoId}`);
   } catch (error) {
     logger.error(`Error processing video ${videoId}`, error);
@@ -168,6 +233,19 @@ const processVideoJob = async (job) => {
     video.processingError = error.message || "Unknown processing error";
     video.lastProcessingFailedAt = new Date();
     await video.save();
+    emitProcessingStatus(video);
+    await createNotification({
+      recipient: video.owner,
+      type: "processing_failed",
+      title: "Video processing failed",
+      message: `Processing failed for "${video.title}": ${video.processingError}`,
+      link: "/my-videos",
+      entityType: "video",
+      entityId: video._id,
+      metadata: {
+        processingJobId: job.id
+      }
+    });
     throw error;
   } finally {
     await fs.remove(jobDir).catch((err) => logger.error("Cleanup failed", err));

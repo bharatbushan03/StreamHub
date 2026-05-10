@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Playlist = require("../models/playlist.model");
 const Video = require("../models/video.model");
+const { createActivity } = require("../services/activity.service");
 
 const VISIBILITY_VALUES = new Set(["public", "private", "unlisted"]);
 
@@ -178,6 +179,15 @@ const createPlaylist = async (req, res, next) => {
     });
 
     await playlist.populate("owner", "username fullName avatar channelName");
+
+    await createActivity({
+      actor: req.user._id,
+      type: "created_playlist",
+      targetType: "playlist",
+      targetId: playlist._id,
+      message: `${req.user.username} created a playlist: ${playlist.name}.`,
+      visibility: playlist.visibility === "public" ? "public" : "private"
+    });
 
     res.status(201).json({
       success: true,

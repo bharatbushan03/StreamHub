@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -46,6 +47,9 @@ export default function Navbar() {
               <Link to="/subscriptions" className="hover:text-slate-900">
                 Subscriptions
               </Link>
+              <Link to="/activity" className="hover:text-slate-900">
+                Activity
+              </Link>
               <Link to="/history" className="hover:text-slate-900">
                 History
               </Link>
@@ -64,11 +68,18 @@ export default function Navbar() {
               <Link to="/my-reports" className="hover:text-slate-900">
                 My Reports
               </Link>
+              <Link to="/notifications" className="hover:text-slate-900">
+                Notifications
+              </Link>
+              <Link to="/notification-preferences" className="hover:text-slate-900">
+                Preferences
+              </Link>
               {user?.role === "admin" && (
                 <Link to="/admin" className="font-bold text-primary-600 hover:text-primary-800">
                   Admin
                 </Link>
               )}
+              <NotificationBell />
               <span className="hidden text-xs font-semibold uppercase text-slate-400 sm:inline">
                 {user?.username}
               </span>

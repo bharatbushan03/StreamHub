@@ -39,4 +39,13 @@ export const processingService = {
   removeAdminProcessingJob
 };
 
+export {
+  getVideoProcessingStatus,
+  retryVideoProcessing,
+  cancelVideoProcessing,
+  getAdminProcessingJobs,
+  retryAdminProcessingJob,
+  removeAdminProcessingJob
+};
+
 export default processingService;

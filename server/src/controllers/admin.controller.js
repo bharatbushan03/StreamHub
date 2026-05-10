@@ -3,6 +3,7 @@ const Video = require("../models/video.model");
 const Comment = require("../models/comment.model");
 const Report = require("../models/report.model");
 const { videoProcessingQueue } = require("../queues/videoProcessing.queue");
+const { createNotification } = require("../services/notification.service");
 
 const getAdminDashboardStats = async (req, res, next) => {
   try {
@@ -198,6 +199,17 @@ const updateUserRole = async (req, res, next) => {
     user.role = role;
     await user.save();
 
+    await createNotification({
+      recipient: user._id,
+      sender: req.user._id,
+      type: "account_banned",
+      title: "Account banned",
+      message: `Your account has been banned. Reason: ${reason}`,
+      link: "/profile",
+      entityType: "user",
+      entityId: user._id
+    });
+
     res.status(200).json({
       success: true,
       user
@@ -247,6 +259,17 @@ const banUser = async (req, res, next) => {
     user.refreshToken = "";
 
     await user.save();
+
+    await createNotification({
+      recipient: user._id,
+      sender: req.user._id,
+      type: "account_unbanned",
+      title: "Account unbanned",
+      message: "Your StreamHub account has been unbanned.",
+      link: "/profile",
+      entityType: "user",
+      entityId: user._id
+    });
 
     res.status(200).json({
       success: true,
@@ -405,6 +428,17 @@ const blockVideo = async (req, res, next) => {
 
     await video.save();
 
+    await createNotification({
+      recipient: video.owner,
+      sender: req.user._id,
+      type: "video_blocked",
+      title: "Video blocked",
+      message: `Your video "${video.title}" was blocked. Reason: ${reason}`,
+      link: `/my-videos`,
+      entityType: "video",
+      entityId: video._id
+    });
+
     res.status(200).json({
       success: true,
       video
@@ -436,6 +470,17 @@ const unblockVideo = async (req, res, next) => {
     video.blockedBy = null;
 
     await video.save();
+
+    await createNotification({
+      recipient: video.owner,
+      sender: req.user._id,
+      type: "video_unblocked",
+      title: "Video unblocked",
+      message: `Your video "${video.title}" has been unblocked.`,
+      link: `/watch/${video._id}`,
+      entityType: "video",
+      entityId: video._id
+    });
 
     res.status(200).json({
       success: true,

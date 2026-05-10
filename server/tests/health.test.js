@@ -3,6 +3,18 @@ const request = require("supertest");
 process.env.NODE_ENV = "test";
 
 const app = require("../src/app");
+const redisConnection = require("../src/config/redis");
+const { videoProcessingQueue } = require("../src/queues/videoProcessing.queue");
+
+afterAll(async () => {
+  if (videoProcessingQueue?.disconnect) {
+    await videoProcessingQueue.disconnect();
+  }
+
+  if (redisConnection?.disconnect) {
+    redisConnection.disconnect();
+  }
+});
 
 describe("Health routes", () => {
   it("GET /api/health returns ok", async () => {

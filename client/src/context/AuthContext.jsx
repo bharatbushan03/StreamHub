@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import { connectSocket, disconnectSocket } from "../services/socket";
 import { clearStoredAuth, getStoredAuth, setStoredAuth, updateStoredUser } from "../utils/authStorage";
 
 const AuthContext = createContext(null);
@@ -15,6 +16,9 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(nextAccess || null);
     setRefreshToken(nextRefresh || null);
     setStoredAuth({ user: nextUser, accessToken: nextAccess, refreshToken: nextRefresh });
+    if (nextAccess) {
+      connectSocket(nextAccess);
+    }
   };
 
   const clearAuth = () => {
@@ -22,6 +26,7 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(null);
     setRefreshToken(null);
     clearStoredAuth();
+    disconnectSocket();
   };
 
   const fetchCurrentUser = async () => {
@@ -66,6 +71,7 @@ export const AuthProvider = ({ children }) => {
       setAccessToken(stored.accessToken);
       setRefreshToken(stored.refreshToken);
       setUser(stored.user || null);
+      connectSocket(stored.accessToken);
       fetchCurrentUser();
     } else {
       setLoading(false);
@@ -77,6 +83,14 @@ export const AuthProvider = ({ children }) => {
     window.addEventListener("auth:logout", handleLogout);
     return () => window.removeEventListener("auth:logout", handleLogout);
   }, []);
+
+  useEffect(() => {
+    if (accessToken && user) {
+      connectSocket(accessToken);
+    } else {
+      disconnectSocket();
+    }
+  }, [accessToken, user?._id]);
 
   const value = useMemo(
     () => ({

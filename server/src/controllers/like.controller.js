@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const Like = require("../models/like.model");
 const Video = require("../models/video.model");
+const { createNotification } = require("../services/notification.service");
+const { createActivity } = require("../services/activity.service");
 
 const ensureVideoAccess = async (videoId, user) => {
   if (!mongoose.Types.ObjectId.isValid(videoId)) {
@@ -57,6 +59,37 @@ const syncReactionCounts = async (videoId) => {
   return { likesCount, dislikesCount };
 };
 
+const notifyVideoLike = async ({ video, user }) => {
+  if (video.owner.toString() === user._id.toString()) {
+    return;
+  }
+
+  await createNotification({
+    recipient: video.owner,
+    sender: user._id,
+    type: "video_like",
+    title: "New like",
+    message: `${user.username} liked your video: ${video.title}`,
+    link: `/watch/${video._id}`,
+    entityType: "video",
+    entityId: video._id,
+    metadata: {
+      videoTitle: video.title
+    }
+  });
+
+  if (video.visibility === "public" && video.status === "published" && !video.isBlocked) {
+    await createActivity({
+      actor: user._id,
+      type: "liked_video",
+      targetType: "video",
+      targetId: video._id,
+      message: `${user.username} liked ${video.title}.`,
+      visibility: "public"
+    });
+  }
+};
+
 const toggleLike = async (req, res, next) => {
   try {
     const { videoId } = req.params;
@@ -78,6 +111,7 @@ const toggleLike = async (req, res, next) => {
       }
 
       const counts = await syncReactionCounts(video._id);
+      await notifyVideoLike({ video, user: req.user });
       return res.status(200).json({
         success: true,
         message: "Video liked successfully",
@@ -100,6 +134,7 @@ const toggleLike = async (req, res, next) => {
     existing.type = "like";
     await existing.save();
     const counts = await syncReactionCounts(video._id);
+    await notifyVideoLike({ video, user: req.user });
     return res.status(200).json({
       success: true,
       message: "Video liked successfully",

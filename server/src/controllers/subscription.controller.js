@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const Subscription = require("../models/subscription.model");
 const User = require("../models/user.model");
+const { createNotification } = require("../services/notification.service");
+const { createActivity } = require("../services/activity.service");
 
 const createError = (message, statusCode) => {
   const error = new Error(message);
@@ -86,6 +88,26 @@ const subscribeToChannel = async (req, res, next) => {
     }
 
     const { subscribersCount } = await syncSubscriptionCounts(req.user._id, channel._id);
+
+    await createNotification({
+      recipient: channel._id,
+      sender: req.user._id,
+      type: "new_subscriber",
+      title: "New subscriber",
+      message: `${req.user.username} subscribed to your channel.`,
+      link: `/channel/${req.user.username}`,
+      entityType: "user",
+      entityId: req.user._id
+    });
+
+    await createActivity({
+      actor: req.user._id,
+      type: "subscribed_channel",
+      targetType: "user",
+      targetId: channel._id,
+      message: `${req.user.username} subscribed to ${channel.channelName || channel.username}.`,
+      visibility: "public"
+    });
 
     res.status(200).json({
       success: true,

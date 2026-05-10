@@ -3,6 +3,9 @@ dist/
 build/
 .env
 .env.*
+!.env.example
+!server/.env.example
+!client/.env.example
 .DS_Store
 uploads/
 server/uploads/

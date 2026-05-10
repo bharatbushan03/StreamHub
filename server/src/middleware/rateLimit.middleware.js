@@ -1,6 +1,6 @@
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
-const getUserOrIp = (req) => req.user?._id?.toString() || req.ip;
+const getUserOrIp = (req) => req.user?._id?.toString() || ipKeyGenerator(req.ip);
 
 const createLimiter = ({ windowMs, max, message, keyGenerator }) =>
   rateLimit({
@@ -27,7 +27,7 @@ const authLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: "Too many auth attempts. Please try again later.",
-  keyGenerator: (req) => req.ip
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
 });
 
 const uploadLimiter = createLimiter({

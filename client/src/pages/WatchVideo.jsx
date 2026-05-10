@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import HLSPlayer from "../components/HLSPlayer";
 import ProcessingProgress from "../components/ProcessingProgress";
 import RelatedVideos from "../components/RelatedVideos";
+import ReportModal from "../components/ReportModal";
 import VideoStatusBadge from "../components/VideoStatusBadge";
 import api from "../services/api";
 import { trackVideoEvent } from "../services/analyticsService";
@@ -99,6 +100,11 @@ export default function WatchVideo() {
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [relatedError, setRelatedError] = useState("");
+  const [reportModal, setReportModal] = useState({
+    isOpen: false,
+    targetType: "video",
+    targetId: ""
+  });
 
   const fetchVideo = async () => {
     setLoading(true);
@@ -1079,20 +1085,6 @@ export default function WatchVideo() {
         targetType={reportModal.targetType}
         targetId={reportModal.targetId}
       />
-    </div>
-  );
-}
-   </div>
-
-            <RelatedVideos
-              videos={relatedVideos}
-              loading={relatedLoading}
-              error={relatedError}
-            />
-          </div>
-        )}
-      </main>
-      <Footer />
     </div>
   );
 }

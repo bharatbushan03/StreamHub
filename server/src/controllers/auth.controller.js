@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
+const NotificationPreference = require("../models/notificationPreference.model");
 const { generateTokens } = require("../utils/generateTokens");
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -59,6 +60,8 @@ const registerUser = async (req, res, next) => {
       email,
       password
     });
+
+    NotificationPreference.create({ user: user._id }).catch(() => {});
 
     res.status(201).json({
       success: true,

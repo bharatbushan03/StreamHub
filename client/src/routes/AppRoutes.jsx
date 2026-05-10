@@ -37,6 +37,9 @@ import AdminReportDetails from "../pages/admin/AdminReportDetails";
 import AdminAnalytics from "../pages/admin/AdminAnalytics";
 import AdminProcessingJobs from "../pages/admin/AdminProcessingJobs";
 import MyReports from "../pages/MyReports";
+import Notifications from "../pages/Notifications";
+import NotificationPreferences from "../pages/NotificationPreferences";
+import ActivityFeed from "../pages/ActivityFeed";
 
 export default function AppRoutes() {
   return (
@@ -152,6 +155,30 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <MyReports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notification-preferences"
+        element={
+          <ProtectedRoute>
+            <NotificationPreferences />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity"
+        element={
+          <ProtectedRoute>
+            <ActivityFeed />
           </ProtectedRoute>
         }
       />

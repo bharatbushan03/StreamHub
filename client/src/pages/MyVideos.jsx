@@ -57,6 +57,37 @@ export default function MyVideos() {
   }, []);
 
   useEffect(() => {
+    const handleProcessingStatus = (event) => {
+      const payload = event.detail || {};
+      if (!payload.videoId) {
+        return;
+      }
+
+      setVideos((prev) =>
+        prev.map((video) =>
+          video._id === payload.videoId
+            ? {
+                ...video,
+                status: payload.status || video.status,
+                processingProgress:
+                  payload.processingProgress ?? video.processingProgress,
+                processingError: payload.processingError ?? video.processingError,
+                processingJobId: payload.processingJobId ?? video.processingJobId
+              }
+            : video
+        )
+      );
+
+      if (["published", "failed"].includes(payload.status)) {
+        fetchMyVideos();
+      }
+    };
+
+    window.addEventListener("video:processing_status", handleProcessingStatus);
+    return () => window.removeEventListener("video:processing_status", handleProcessingStatus);
+  }, []);
+
+  useEffect(() => {
     const hasProcessingVideos = videos.some((video) =>
       ["uploaded", "processing"].includes(video.status)
     );
@@ -167,7 +198,7 @@ export default function MyVideos() {
 
     try {
       const response = await retryVideoProcessing(videoId);
-      const updatedVideo = response.data?.video;
+      const updatedVideo = response.video;
       setVideos((prev) =>
         prev.map((video) => (video._id === videoId ? updatedVideo || video : video))
       );

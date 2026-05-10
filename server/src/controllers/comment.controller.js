@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const Comment = require("../models/comment.model");
 const Video = require("../models/video.model");
+const { createNotification } = require("../services/notification.service");
+const { createActivity } = require("../services/activity.service");
 
 const buildCommentResponse = (comment) => ({
   _id: comment._id,
@@ -85,6 +87,38 @@ const addComment = async (req, res, next) => {
     await syncCommentsCount(video._id);
 
     await comment.populate("user", "username fullName avatar");
+
+    const isVideoOwner = video.owner.toString() === req.user._id.toString();
+    if (!isVideoOwner) {
+      await createNotification({
+        recipient: video.owner,
+        sender: req.user._id,
+        type: "video_comment",
+        title: "New comment",
+        message: `${req.user.username} commented on your video: ${video.title}`,
+        link: `/watch/${video._id}`,
+        entityType: "comment",
+        entityId: comment._id,
+        metadata: {
+          videoId: video._id,
+          videoTitle: video.title
+        }
+      });
+    }
+
+    if (video.visibility === "public" && video.status === "published" && !video.isBlocked) {
+      await createActivity({
+        actor: req.user._id,
+        type: "commented_video",
+        targetType: "comment",
+        targetId: comment._id,
+        message: `${req.user.username} commented on ${video.title}.`,
+        visibility: "public",
+        metadata: {
+          videoId: video._id
+        }
+      });
+    }
 
     res.status(201).json({
       success: true,

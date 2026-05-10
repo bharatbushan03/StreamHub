@@ -1,8 +1,10 @@
 require("./config/env");
+const http = require("http");
 const app = require("./app");
 const { connectDB, disconnectDB } = require("./config/db");
 const redisConnection = require("./config/redis");
 const { videoProcessingQueue } = require("./queues/videoProcessing.queue");
+const { initializeSocket, closeSocket } = require("./socket/socket");
 const { logger } = require("./utils/logger");
 
 const PORT = process.env.PORT || 5000;
@@ -12,13 +14,16 @@ const startServer = async () => {
   try {
     await connectDB();
 
+    server = http.createServer(app);
+    initializeSocket(server);
+
     // Start worker in same process if enabled (useful for local development)
     if (process.env.ENABLE_WORKER_IN_SERVER === "true") {
       require("./workers/videoProcessing.worker");
       logger.info("Video processing worker started within server process");
     }
 
-    server = app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`StreamHub API listening on port ${PORT}`);
     });
   } catch (err) {
@@ -34,6 +39,7 @@ const shutdown = async (signal, exitCode = 0) => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
+    await closeSocket();
     if (videoProcessingQueue) {
       await videoProcessingQueue.close();
     }
