@@ -56,6 +56,12 @@ const getSignedReadUrl = async ({ key }) => {
   return getPublicUrl(key);
 };
 
+const healthCheck = async () => {
+  await fs.ensureDir(UPLOAD_ROOT);
+  await fs.access(UPLOAD_ROOT, fs.constants.W_OK);
+  return true;
+};
+
 module.exports = {
   uploadFile,
   uploadBuffer,
@@ -64,5 +70,6 @@ module.exports = {
   getPublicUrl,
   fileExists,
   getSignedUploadUrl,
-  getSignedReadUrl
+  getSignedReadUrl,
+  healthCheck
 };

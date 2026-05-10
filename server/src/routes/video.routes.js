@@ -24,10 +24,11 @@ const {
 } = require("../controllers/watchHistory.controller");
 const { verifyJWT, optionalAuth } = require("../middleware/auth.middleware");
 const { uploadVideoFiles, uploadThumbnail } = require("../middleware/upload.middleware");
+const { uploadLimiter } = require("../middleware/rateLimit.middleware");
 
 const router = express.Router();
 
-router.post("/upload", verifyJWT, uploadVideoFiles, uploadVideo);
+router.post("/upload", verifyJWT, uploadLimiter, uploadVideoFiles, uploadVideo);
 router.get("/", getAllPublicVideos);
 router.get("/my-videos", verifyJWT, getMyVideos);
 router.get("/:videoId/status", optionalAuth, getVideoStatus);

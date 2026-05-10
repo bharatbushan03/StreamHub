@@ -80,6 +80,11 @@ const getPlatformAnalytics = async () => {
   return response.data;
 };
 
+const getSystemHealth = async () => {
+  const response = await api.get("/health/full");
+  return response.data;
+};
+
 export const adminService = {
   getAdminDashboardStats,
   getAllUsers,
@@ -96,7 +101,8 @@ export const adminService = {
   blockComment,
   unblockComment,
   deleteCommentAsAdmin,
-  getPlatformAnalytics
+  getPlatformAnalytics,
+  getSystemHealth
 };
 
 export default adminService;

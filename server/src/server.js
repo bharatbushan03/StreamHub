@@ -1,53 +1,64 @@
-require("dotenv").config();
+require("./config/env");
 const app = require("./app");
-const { connectDB } = require("./config/db");
+const { connectDB, disconnectDB } = require("./config/db");
+const redisConnection = require("./config/redis");
+const { videoProcessingQueue } = require("./queues/videoProcessing.queue");
+const { logger } = require("./utils/logger");
 
 const PORT = process.env.PORT || 5000;
 let server;
 
 const startServer = async () => {
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI is missing. Add it to server/.env");
-    }
-
-    if (!process.env.CLIENT_URL) {
-      console.warn("CLIENT_URL is not set. Using http://localhost:5173 by default.");
-    }
-
     await connectDB();
 
     // Start worker in same process if enabled (useful for local development)
     if (process.env.ENABLE_WORKER_IN_SERVER === "true") {
       require("./workers/videoProcessing.worker");
-      console.log("Video processing worker started within server process");
+      logger.info("Video processing worker started within server process");
     }
 
     server = app.listen(PORT, () => {
-      console.log(`StreamHub API listening on port ${PORT}`);
+      logger.info(`StreamHub API listening on port ${PORT}`);
     });
   } catch (err) {
-    console.error("Server startup failed:", err.message);
+    logger.error("Server startup failed", err);
     process.exit(1);
+  }
+};
+
+const shutdown = async (signal, exitCode = 0) => {
+  logger.warn(`Received ${signal}. Shutting down...`);
+
+  try {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    if (videoProcessingQueue) {
+      await videoProcessingQueue.close();
+    }
+    if (redisConnection) {
+      await redisConnection.quit();
+    }
+    await disconnectDB();
+  } catch (err) {
+    logger.error("Error during shutdown", err);
+  } finally {
+    process.exit(exitCode);
   }
 };
 
 startServer();
 
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
 process.on("unhandledRejection", (err) => {
-  console.error("Unhandled promise rejection:", err);
-  if (server) {
-    server.close(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
+  logger.error("Unhandled promise rejection", err);
+  shutdown("unhandledRejection", 1);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
-  if (server) {
-    server.close(() => process.exit(1));
-  } else {
-    process.exit(1);
-  }
+  logger.error("Uncaught exception", err);
+  shutdown("uncaughtException", 1);
 });

@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command, HeadBucketCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const fs = require("fs-extra");
 const path = require("path");
@@ -111,6 +111,19 @@ const getSignedReadUrl = async ({ key, expiresIn = 3600 }) => {
   return getPublicUrl(key);
 };
 
+const healthCheck = async () => {
+  if (!bucketName) {
+    throw new Error("AWS_S3_BUCKET is missing");
+  }
+
+  const command = new HeadBucketCommand({
+    Bucket: bucketName
+  });
+
+  await s3Client.send(command);
+  return true;
+};
+
 module.exports = {
   uploadFile,
   uploadBuffer,
@@ -119,5 +132,6 @@ module.exports = {
   getPublicUrl,
   fileExists,
   getSignedUploadUrl,
-  getSignedReadUrl
+  getSignedReadUrl,
+  healthCheck
 };

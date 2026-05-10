@@ -12,6 +12,35 @@ const api = axios.create({
   timeout: 8000
 });
 
+const dispatchClientEvent = (name, detail) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+};
+
+const normalizeApiError = (error) => {
+  const status = error?.response?.status;
+  let message = error?.response?.data?.message || "Request failed.";
+
+  if (error?.code === "ECONNABORTED") {
+    message = "Request timed out. Please try again.";
+  } else if (!error?.response) {
+    message = "Unable to reach the server. Check your connection.";
+  } else if (status === 401) {
+    message = "Your session expired. Please sign in again.";
+  } else if (status === 403) {
+    message = "You do not have access to this resource.";
+  } else if (status === 429) {
+    message = "Too many requests. Please wait and try again.";
+  } else if (status >= 500) {
+    message = "Server error. Please try again later.";
+  }
+
+  error.userMessage = message;
+  error.message = message;
+  return error;
+};
+
 api.interceptors.request.use((config) => {
   const { accessToken } = getStoredAuth();
   if (accessToken) {
@@ -26,10 +55,18 @@ api.interceptors.response.use(
     if (error?.response?.status === 401) {
       clearStoredAuth();
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth:logout"));
+        dispatchClientEvent("auth:logout");
       }
     }
-    return Promise.reject(error);
+
+    if (error?.response?.status === 403) {
+      dispatchClientEvent("auth:forbidden");
+    }
+
+    if (error?.response?.status === 429) {
+      dispatchClientEvent("rate:limited");
+    }
+    return Promise.reject(normalizeApiError(error));
   }
 );
 
