@@ -11,6 +11,7 @@ const AdminLayout = () => {
     { name: "Videos", href: "/admin/videos", icon: "🎬" },
     { name: "Comments", href: "/admin/comments", icon: "💬" },
     { name: "Reports", href: "/admin/reports", icon: "🚩" },
+    { name: "Jobs", href: "/admin/processing-jobs", icon: "⚙️" },
     { name: "Analytics", href: "/admin/analytics", icon: "📈" }
   ];
 

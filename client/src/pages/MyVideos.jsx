@@ -5,7 +5,7 @@ import Footer from "../components/Footer";
 import ProcessingProgress from "../components/ProcessingProgress";
 import VideoStatusBadge from "../components/VideoStatusBadge";
 import api, { createUploadConfig } from "../services/api";
-import { retryVideoProcessing } from "../services/videoService";
+import { retryVideoProcessing, cancelVideoProcessing } from "../services/processingService";
 import { getAssetUrl } from "../utils/url";
 
 const visibilityOptions = ["public", "private", "unlisted"];
@@ -32,9 +32,11 @@ export default function MyVideos() {
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [retryingId, setRetryingId] = useState("");
+  const [cancellingId, setCancellingId] = useState("");
 
   const fetchMyVideos = async () => {
-    setLoading(true);
+    // Only set global loading on first fetch
+    if (videos.length === 0) setLoading(true);
     setError("");
 
     try {
@@ -63,7 +65,7 @@ export default function MyVideos() {
       return undefined;
     }
 
-    const timer = window.setInterval(fetchMyVideos, 5000);
+    const timer = window.setInterval(fetchMyVideos, 4000);
     return () => window.clearInterval(timer);
   }, [videos]);
 
@@ -180,6 +182,25 @@ export default function MyVideos() {
     }
   };
 
+  const handleCancelProcessing = async (videoId) => {
+    if (!window.confirm("Cancel video processing?")) return;
+    setCancellingId(videoId);
+    setStatus({ type: "", message: "" });
+
+    try {
+      await cancelVideoProcessing(videoId);
+      setStatus({ type: "success", message: "Video processing cancelled." });
+      fetchMyVideos();
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: err?.response?.data?.message || "Unable to cancel video processing."
+      });
+    } finally {
+      setCancellingId("");
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -253,6 +274,16 @@ export default function MyVideos() {
                     <h3 className="text-base font-semibold text-slate-900">{video.title}</h3>
                     <VideoStatusBadge status={video.status} />
                   </div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded uppercase font-bold text-slate-500">
+                      {video.storageProvider || "local"}
+                    </span>
+                    {video.processingAttempts > 1 && (
+                       <span className="text-[10px] bg-orange-100 px-2 py-0.5 rounded uppercase font-bold text-orange-600">
+                        Retry #{video.processingAttempts - 1}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-2 text-xs text-slate-500">
                     {video.visibility} - {video.views} views - {formatDuration(video.duration)}
                   </p>
@@ -272,6 +303,16 @@ export default function MyVideos() {
 
               {["uploaded", "processing"].includes(video.status) && (
                 <div className="mt-4">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-bold text-teal-600 uppercase">Processing</span>
+                    <button 
+                      onClick={() => handleCancelProcessing(video._id)}
+                      disabled={cancellingId === video._id}
+                      className="text-[10px] font-bold text-rose-500 hover:text-rose-700"
+                    >
+                      {cancellingId === video._id ? "Cancelling..." : "Cancel"}
+                    </button>
+                  </div>
                   <ProcessingProgress
                     status={video.status}
                     progress={video.processingProgress || 0}
@@ -407,3 +448,4 @@ export default function MyVideos() {
     </div>
   );
 }
+

@@ -7,7 +7,8 @@ const {
   getMyVideos,
   updateVideoDetails,
   deleteVideo,
-  retryVideoProcessing
+  retryVideoProcessing,
+  cancelVideoProcessing
 } = require("../controllers/video.controller");
 const {
   toggleLike,
@@ -31,6 +32,7 @@ router.get("/", getAllPublicVideos);
 router.get("/my-videos", verifyJWT, getMyVideos);
 router.get("/:videoId/status", optionalAuth, getVideoStatus);
 router.post("/:videoId/retry-processing", verifyJWT, retryVideoProcessing);
+router.post("/:videoId/cancel-processing", verifyJWT, cancelVideoProcessing);
 router.post("/:videoId/like", verifyJWT, toggleLike);
 router.post("/:videoId/dislike", verifyJWT, toggleDislike);
 router.get("/:videoId/reaction", verifyJWT, getVideoReactionStatus);

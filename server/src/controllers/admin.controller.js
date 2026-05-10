@@ -2,6 +2,7 @@ const User = require("../models/user.model");
 const Video = require("../models/video.model");
 const Comment = require("../models/comment.model");
 const Report = require("../models/report.model");
+const { videoProcessingQueue } = require("../queues/videoProcessing.queue");
 
 const getAdminDashboardStats = async (req, res, next) => {
   try {
@@ -670,6 +671,72 @@ const getPlatformAnalytics = async (req, res, next) => {
   }
 };
 
+const getAdminProcessingJobs = async (req, res, next) => {
+  try {
+    const [waiting, active, failed, completed, delayed] = await Promise.all([
+      videoProcessingQueue.getWaiting(),
+      videoProcessingQueue.getActive(),
+      videoProcessingQueue.getFailed(),
+      videoProcessingQueue.getCompletedCount(),
+      videoProcessingQueue.getDelayed(),
+    ]);
+
+    const formatJob = (job) => ({
+      id: job.id,
+      name: job.name,
+      data: job.data,
+      timestamp: job.timestamp,
+      attemptsMade: job.attemptsMade,
+      failedReason: job.failedReason,
+      stacktrace: job.stacktrace,
+      progress: job.progress,
+    });
+
+    res.status(200).json({
+      success: true,
+      jobs: {
+        waiting: waiting.map(formatJob),
+        active: active.map(formatJob),
+        failed: failed.map(formatJob),
+        completedCount: completed,
+        delayed: delayed.map(formatJob),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const retryAdminProcessingJob = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const job = await videoProcessingQueue.getJob(jobId);
+    if (!job) {
+      res.status(404);
+      throw new Error("Job not found");
+    }
+    await job.retry();
+    res.status(200).json({ success: true, message: "Job retried successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const removeAdminProcessingJob = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const job = await videoProcessingQueue.getJob(jobId);
+    if (!job) {
+      res.status(404);
+      throw new Error("Job not found");
+    }
+    await job.remove();
+    res.status(200).json({ success: true, message: "Job removed successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAdminDashboardStats,
   getAllUsers,
@@ -686,5 +753,8 @@ module.exports = {
   blockComment,
   unblockComment,
   deleteCommentAsAdmin,
-  getPlatformAnalytics
+  getPlatformAnalytics,
+  getAdminProcessingJobs,
+  retryAdminProcessingJob,
+  removeAdminProcessingJob
 };

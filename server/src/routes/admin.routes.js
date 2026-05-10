@@ -16,7 +16,10 @@ const {
   blockComment,
   unblockComment,
   deleteCommentAsAdmin,
-  getPlatformAnalytics
+  getPlatformAnalytics,
+  getAdminProcessingJobs,
+  retryAdminProcessingJob,
+  removeAdminProcessingJob
 } = require("../controllers/admin.controller");
 const { verifyJWT } = require("../middleware/auth.middleware");
 const { authorizeRoles } = require("../middleware/role.middleware");
@@ -27,6 +30,11 @@ router.use(verifyJWT, authorizeRoles("admin"));
 // Dashboard & Analytics
 router.get("/dashboard", getAdminDashboardStats);
 router.get("/analytics", getPlatformAnalytics);
+
+// Processing Jobs
+router.get("/processing-jobs", getAdminProcessingJobs);
+router.post("/processing-jobs/:jobId/retry", retryAdminProcessingJob);
+router.delete("/processing-jobs/:jobId", removeAdminProcessingJob);
 
 // User Management
 router.get("/users", getAllUsers);

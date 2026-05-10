@@ -195,6 +195,61 @@ const videoSchema = new mongoose.Schema(
     reportsCount: {
       type: Number,
       default: 0
+    },
+    storageProvider: {
+      type: String,
+      enum: ["local", "s3"],
+      default: process.env.STORAGE_PROVIDER || "local"
+    },
+    originalFileKey: {
+      type: String,
+      default: ""
+    },
+    originalFileUrl: {
+      type: String,
+      default: ""
+    },
+    thumbnailKey: {
+      type: String,
+      default: ""
+    },
+    thumbnailUrl: {
+      type: String,
+      default: ""
+    },
+    hlsBaseKey: {
+      type: String,
+      default: ""
+    },
+    hlsBaseUrl: {
+      type: String,
+      default: ""
+    },
+    masterPlaylistKey: {
+      type: String,
+      default: ""
+    },
+    processingJobId: {
+      type: String,
+      default: ""
+    },
+    processingAttempts: {
+      type: Number,
+      default: 0
+    },
+    lastProcessingStartedAt: {
+      type: Date
+    },
+    lastProcessingCompletedAt: {
+      type: Date
+    },
+    lastProcessingFailedAt: {
+      type: Date
+    },
+    cleanupStatus: {
+      type: String,
+      enum: ["not_required", "pending", "completed", "failed"],
+      default: "not_required"
     }
   },
   { timestamps: true }

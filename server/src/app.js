@@ -14,6 +14,7 @@ const recommendationRoutes = require("./routes/recommendation.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
 const adminRoutes = require("./routes/admin.routes");
 const reportRoutes = require("./routes/report.routes");
+const uploadRoutes = require("./routes/upload.routes");
 const { hlsAccess } = require("./middleware/hlsAccess.middleware");
 const { notFound } = require("./middleware/notFound");
 const { errorHandler } = require("./middleware/errorHandler");
@@ -64,6 +65,7 @@ app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

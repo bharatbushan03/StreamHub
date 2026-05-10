@@ -23,6 +23,20 @@ import SearchHistory from "../pages/SearchHistory";
 import VideoAnalytics from "../pages/VideoAnalytics";
 import NotFound from "../pages/NotFound";
 import ProtectedRoute from "./ProtectedRoute";
+import AdminRoute from "./AdminRoute";
+import Unauthorized from "../pages/Unauthorized";
+import AdminLayout from "../components/admin/AdminLayout";
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import AdminUsers from "../pages/admin/AdminUsers";
+import AdminUserDetails from "../pages/admin/AdminUserDetails";
+import AdminVideos from "../pages/admin/AdminVideos";
+import AdminVideoDetails from "../pages/admin/AdminVideoDetails";
+import AdminComments from "../pages/admin/AdminComments";
+import AdminReports from "../pages/admin/AdminReports";
+import AdminReportDetails from "../pages/admin/AdminReportDetails";
+import AdminAnalytics from "../pages/admin/AdminAnalytics";
+import AdminProcessingJobs from "../pages/admin/AdminProcessingJobs";
+import MyReports from "../pages/MyReports";
 
 export default function AppRoutes() {
   return (
@@ -152,6 +166,7 @@ export default function AppRoutes() {
           <Route path="comments" element={<AdminComments />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="reports/:reportId" element={<AdminReportDetails />} />
+          <Route path="processing-jobs" element={<AdminProcessingJobs />} />
           <Route path="analytics" element={<AdminAnalytics />} />
         </Route>
       </Route>

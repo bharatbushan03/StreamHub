@@ -17,6 +17,12 @@ const startServer = async () => {
 
     await connectDB();
 
+    // Start worker in same process if enabled (useful for local development)
+    if (process.env.ENABLE_WORKER_IN_SERVER === "true") {
+      require("./workers/videoProcessing.worker");
+      console.log("Video processing worker started within server process");
+    }
+
     server = app.listen(PORT, () => {
       console.log(`StreamHub API listening on port ${PORT}`);
     });

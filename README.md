@@ -4,283 +4,114 @@ StreamHub is a production-minded video streaming app built with React, Express, 
 
 ## Current Completed Phase
 
-Phase 7 is complete: Advanced Search, Recommendations, Trending Videos, and Analytics.
+Phase 9 is complete: Cloud Storage, Redis Queue, Background Video Processing, and CDN-ready HLS Delivery.
 
-Included in Phase 7:
+Included in Phase 9:
 
-- Advanced video search with query, category, tags, creator, duration, upload date, sorting, and pagination.
-- Search suggestions from public published videos, tags, categories, and creator/channel names.
-- Logged-in user search history with delete one and clear all.
-- Personalized home feed using watch history, liked videos, tags, categories, subscriptions, recent uploads, and trending score.
-- Related videos on the watch page.
-- Trending videos with a simple explainable score.
-- Video analytics event tracking for impressions, clicks, views, watch progress, and completions.
-- Creator analytics and single video analytics pages.
+- Production-ready background video processing using Redis and BullMQ.
+- Support for multiple storage providers (Local and AWS S3).
+- Storage provider abstraction for seamless switching between local dev and cloud production.
+- Separate video processing worker to offload CPU-intensive FFmpeg tasks.
+- Retryable and cancellable video processing jobs with exponential backoff.
+- Automatic download from S3 and upload of generated HLS files/thumbnails back to S3.
+- Admin management for processing jobs: view active, waiting, and failed jobs.
+- Refactored upload flow with immediate user feedback while processing happens in the background.
+- Support for signed upload URLs (optional for S3 provider).
+- Cleanup service for temporary and deleted video files.
+- CDN-ready HLS delivery URLs.
 
-Not included yet: admin dashboard, cloud storage, payments, real-time notifications, Redis, Docker, or ML recommendations.
+Not included yet: Docker, final multi-server deployment, payment system, or real-time chat.
 
 ## Tech Stack
 
 - Frontend: React with Vite, Tailwind CSS, React Router DOM, Axios, hls.js
-- Backend: Node.js, Express, MongoDB with Mongoose, JWT auth, Multer, fluent-ffmpeg
-- Storage: local files under `server/uploads`
-- Recommendation approach: rule-based ranking, no ML model yet
+- Backend: Node.js, Express, MongoDB with Mongoose, BullMQ, ioredis, AWS SDK v3
+- Background Worker: Dedicated process for FFmpeg tasks
+- Storage: local fallback or AWS S3-compatible cloud storage
+- Job Queue: Redis-backed BullMQ
 
 ## Environment Variables
 
 Server: `server/.env`
 
 ```env
+# Core
 PORT=5000
 MONGO_URI=your_mongodb_connection_string
 CLIENT_URL=http://localhost:5173
-ACCESS_TOKEN_SECRET=your_access_token_secret
-ACCESS_TOKEN_EXPIRY=1h
-REFRESH_TOKEN_SECRET=your_refresh_token_secret
-REFRESH_TOKEN_EXPIRY=7d
-```
 
-Client: `client/.env`
+# Storage (local or s3)
+STORAGE_PROVIDER=local
+LOCAL_UPLOAD_BASE_URL=http://localhost:5000/uploads
 
-```env
-VITE_API_BASE_URL=http://localhost:5000/api
+# AWS S3 (Required if provider is s3)
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=ap-south-1
+AWS_S3_BUCKET=...
+AWS_CLOUDFRONT_URL=
+
+# Redis (Required for background processing)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+# Processing
+VIDEO_PROCESSING_CONCURRENCY=1
+ENABLE_WORKER_IN_SERVER=true
 ```
 
 ## How to Run
 
-Backend:
+1. Start Redis:
+   - Linux/Mac: `sudo service redis-server start`
+   - Windows: Start `redis-server.exe`
+2. Start Backend:
+   - `cd server && npm run dev`
+3. Start Worker (if not enabled in server process):
+   - `cd server && npm run worker`
+4. Start Frontend:
+   - `cd client && npm run dev`
 
-```bash
-cd server
-npm install
-npm run dev
-```
+## New Architecture: Upload & Processing
 
-Frontend:
+1. **Upload:** User uploads a video through the frontend.
+2. **Persistence:** Backend receives the file, uploads the original to the Storage Provider (Local or S3), and creates a Video record with status `uploaded`.
+3. **Queue:** A `process_video` job is added to the BullMQ Redis queue. The API immediately returns success to the user.
+4. **Processing:** The Background Worker picks up the job.
+   - If S3: Downloads the original to local temp.
+   - Runs FFmpeg to generate HLS playlists (.m3u8) and segments (.ts) for multiple qualities.
+   - Generates a thumbnail.
+   - Uploads all generated files to the Storage Provider.
+5. **Completion:** Record is updated to status `published` with public CDN/S3 URLs.
 
-```bash
-cd client
-npm install
-npm run dev
-```
+## How to Test Local Mode
 
-## FFmpeg Requirement
+1. Ensure `STORAGE_PROVIDER=local` in `.env`.
+2. Start Redis and the backend.
+3. Upload a video.
+4. Go to "My Videos". You will see the video status as "Processing" with a progress bar.
+5. Once complete, you can watch the video.
 
-Phase 6 added FFmpeg and HLS processing. The repo includes `ffmpeg-static` and `ffprobe-static`, but a system install also works.
+## How to Test S3 Mode
 
-Windows check:
+1. Configure AWS credentials and bucket in `.env`.
+2. Ensure `STORAGE_PROVIDER=s3`.
+3. Configure CORS on your S3 bucket to allow your frontend domain for HLS playback.
+4. Upload a video.
+5. Verify the original file and generated HLS folder appear in your S3 bucket under `videos/{videoId}/`.
 
-```bash
-ffmpeg -version
-ffprobe -version
-```
+## Admin Processing Jobs
 
-Optional overrides:
-
-```env
-FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
-FFPROBE_PATH=C:\ffmpeg\bin\ffprobe.exe
-```
-
-## New Backend Models
-
-- `server/src/models/videoAnalytics.model.js`
-  - Tracks `impression`, `click`, `view`, `watch_progress`, `complete`, `like`, `dislike`, `comment`, and `share` events.
-  - Supports guest events with `viewer: null`.
-  - Stores watch time, position, device, browser, country, and traffic source.
-
-- `server/src/models/searchHistory.model.js`
-  - Stores logged-in user searches, filters, result count, and created date.
-
-Updated:
-
-- `server/src/models/video.model.js`
-  - Added `searchKeywords`, `trendingScore`, `engagementScore`, `averageWatchTime`, `totalWatchTime`, `uniqueViewers`, `impressions`, `clickThroughRate`, and `lastViewedAt`.
-
-## New Backend Controllers
-
-- `server/src/controllers/search.controller.js`
-- `server/src/controllers/recommendation.controller.js`
-- `server/src/controllers/analytics.controller.js`
-
-New helper:
-
-- `server/src/utils/searchKeywords.js`
-  - Generates lowercase search keywords from video title, description, category, tags, owner username, owner full name, and channel name.
-
-## New API Routes
-
-Search:
-
-- `GET /api/search/videos`
-- `GET /api/search/suggestions`
-- `GET /api/search/history`
-- `DELETE /api/search/history/:historyId`
-- `DELETE /api/search/history`
-
-Recommendations:
-
-- `GET /api/recommendations/home`
-- `GET /api/recommendations/videos`
-- `GET /api/recommendations/related/:videoId`
-- `GET /api/recommendations/trending`
-- `GET /api/recommendations/subscriptions`
-
-Analytics:
-
-- `POST /api/analytics/video-event`
-- `GET /api/analytics/videos/:videoId`
-- `GET /api/analytics/creator`
-
-All public feeds return only non-deleted, public, published videos.
-
-## New Frontend Pages & Components
-
-Admin Pages (`/admin/*`):
-- `AdminDashboard`, `AdminAnalytics`
-- `AdminUsers`, `AdminUserDetails`
-- `AdminVideos`, `AdminVideoDetails`
-- `AdminComments`
-- `AdminReports`, `AdminReportDetails`
-
-Other Pages:
-- `MyReports.jsx`
-- `Unauthorized.jsx`
-
-Components:
-- `AdminLayout.jsx`
-- `AdminRoute.jsx`
-- `ReportModal.jsx`
-
-Updated:
-- `WatchVideo.jsx`: added report button for video and comments.
-- `Navbar.jsx`: added Admin link (conditional) and My Reports.
-- `AppRoutes.jsx`: added protected admin routes.
-
-## How Recommendation Works
-
-For logged-out users:
-
-- Home feed mixes trending, latest, and popular public published videos.
-
-For logged-in users:
-
-- Uses watch history categories and tags.
-- Uses liked video categories and tags.
-- Uses subscribed creators.
-- Boosts recent and high-engagement videos.
-- Penalizes videos already completed.
-- Limits too many videos from the same creator.
-
-This is intentionally rule-based and explainable. No ML model is used yet.
-
-## How Trending Score Works
-
-Trending is calculated with:
-
-```text
-views * 1
-+ likesCount * 3
-+ commentsCount * 2
-+ recentBoost
-- dislikesCount * 2
-```
-
-Recent boost is highest for videos uploaded in the last 24 hours, then gradually drops for older uploads.
-
-## How Analytics Tracking Works
-
-Frontend sends events without blocking playback:
-
-- Home, search, and trending pages track impressions.
-- Video cards track clicks.
-- Watch page tracks view on open.
-- HLS player progress sends watch progress every 20 seconds.
-- Pause and ended events flush progress.
-- Ended also sends a completion event.
-
-Backend updates video analytics summary fields safely and ignores very recent duplicate user events for impression/click/view.
-
-## How to Test Advanced Search
-
-1. Start backend and frontend.
-2. Upload and publish several public videos with categories and tags.
-3. Open `/search`.
-4. Search by title, category, tag, creator username, or channel name.
-5. Try filters: duration, upload date, and sort order.
-6. Confirm private, deleted, failed, and processing videos do not appear.
-
-## How to Test Search Suggestions
-
-1. Open `/search`.
-2. Type at least two characters.
-3. Confirm suggestions appear.
-4. Click a suggestion and confirm it runs a search.
-
-## How to Test Recommendations
-
-1. Log in.
-2. Watch videos in a category.
-3. Like videos with tags.
-4. Subscribe to a creator.
-5. Return to `/` and check the recommended and subscription sections.
-
-## How to Test Related Videos
-
-1. Open `/watch/:videoId`.
-2. Confirm related videos appear below comments.
-3. Related videos should favor same category, similar tags, same creator, and high engagement.
-
-## How to Test Trending Videos
-
-1. Open `/trending`.
-2. Switch between Today, This week, and This month.
-3. Add likes/comments/views to videos and reload.
-4. Confirm public published videos rank higher with stronger engagement.
-
-## How to Test Analytics Events
-
-1. Open the home page, search page, or trending page.
-2. Click a video card.
-3. Watch at least 20 seconds.
-4. Pause and finish the video.
-5. Open `/videos/:videoId/analytics` as the video owner.
-6. Confirm events, watch time, traffic sources, impressions, and completion rate update.
-
-## How to Test Creator Analytics
-
-1. Log in as a creator.
-2. Open `/creator-analytics`.
-3. Confirm total videos, views, likes, comments, watch time, top videos, traffic sources, and recent performance.
-4. Open a specific video analytics page from My Videos or Creator Analytics.
-
-## Common Errors and Fixes
-
-- `Invalid sort option`: use one of `relevance`, `latest`, `oldest`, `views`, `likes`, `duration`, or `trending`.
-- `Invalid video ID`: check the route parameter is a MongoDB ObjectId.
-- `Video not found`: the video may be private, deleted, failed, processing, or owned by another user.
-- `Unable to load home feed`: confirm backend is running and MongoDB is connected.
-- `Search history item not found`: the item was deleted or belongs to a different user.
-- `You cannot view analytics for this video`: only video owner or admin can view video analytics.
-- No recommendations: create more watch history, likes, subscriptions, or public published videos.
-- No analytics data: open a video through home/search/trending and watch long enough for events to send.
-- HLS playback issues: verify FFmpeg processing completed and `master.m3u8` exists.
+As an admin, navigate to "Admin -> Jobs" in the sidebar to monitor the platform's processing queue, view failed jobs with error reasons, and retry or remove them manually.
 
 ## Verification
 
-Backend load check:
+Worker load check:
 
 ```bash
-node -e "require('./server/src/app'); console.log('server app loaded')"
-```
-
-Frontend build:
-
-```bash
-cd client
-npm run build
+node -e "require('./server/src/workers/videoProcessing.worker'); console.log('worker loaded')"
 ```
 
 ## Next Phase Placeholder
 
-Phase 8 can add the admin dashboard and moderation system: reported content, user controls, creator moderation, platform metrics, and admin-only management screens.
+Phase 10 can add Dockerization and CI/CD pipelines to ensure the entire system (backend, worker, redis, mongodb) can be easily deployed and scaled.
