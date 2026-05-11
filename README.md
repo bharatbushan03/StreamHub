@@ -72,6 +72,7 @@ Client: optional `client/.env`
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api
 VITE_SOCKET_URL=http://localhost:5000
+VITE_DIRECT_UPLOADS=false
 ```
 
 ## New Backend Pieces
@@ -118,6 +119,7 @@ The client image bakes `VITE_API_BASE_URL` and `VITE_SOCKET_URL` at build time. 
 - Set Cloud Run environment variables (including `PORT=8080`, `NODE_ENV=production`, `CLIENT_URL`, `CORS_ALLOWED_ORIGINS`, `MONGO_URI`, `REDIS_*`, and JWT secrets).
 - For production storage, use `STORAGE_PROVIDER=s3` with an S3-compatible endpoint (Cloud Storage supports the S3 API) because the Cloud Run filesystem is ephemeral.
 - Build and deploy the client image from `client/` (or host the static build on Cloud Storage + CDN). Set `VITE_API_BASE_URL` at build time to the API URL.
+- Cloud Run has a small request size limit, so large video uploads must use direct-to-storage uploads. Set `VITE_DIRECT_UPLOADS=true` on the client and use the signed URL endpoint (`/api/uploads/signed-url`).
 
 ## Testing Real-Time Notifications
 

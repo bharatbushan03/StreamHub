@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -8,6 +9,7 @@ const videoExtensions = ["mp4", "mov", "mkv", "webm"];
 const thumbnailExtensions = ["jpg", "jpeg", "png", "webp"];
 const maxVideoSize = 200 * 1024 * 1024;
 const maxThumbnailSize = 5 * 1024 * 1024;
+const useDirectUploads = import.meta.env.VITE_DIRECT_UPLOADS === "true";
 
 export default function UploadVideo() {
   const navigate = useNavigate();
@@ -89,27 +91,88 @@ export default function UploadVideo() {
     setProgress(0);
 
     try {
-      const payload = new FormData();
-      payload.append("title", formData.title.trim());
-      payload.append("description", formData.description.trim());
-      payload.append("category", formData.category.trim());
-      payload.append("tags", formData.tags.trim());
-      payload.append("visibility", formData.visibility);
-      payload.append("video", videoFile);
+      if (useDirectUploads) {
+        const videoUpload = await api.post("/uploads/signed-url", {
+          fileName: videoFile.name,
+          contentType: videoFile.type || "application/octet-stream",
+          type: "video"
+        });
 
-      if (thumbnailFile) {
-        payload.append("thumbnail", thumbnailFile);
-      }
+        if (!videoUpload.data?.success) {
+          throw new Error(videoUpload.data?.message || "Signed uploads are not available.");
+        }
 
-      await api.post(
-        "/videos/upload",
-        payload,
-        createUploadConfig((event) => {
-          if (event.total) {
-            setProgress(Math.round((event.loaded / event.total) * 100));
+        const { uploadUrl, key, videoId } = videoUpload.data;
+
+        await axios.put(uploadUrl, videoFile, {
+          headers: { "Content-Type": videoFile.type || "application/octet-stream" },
+          onUploadProgress: (event) => {
+            if (event.total) {
+              setProgress(Math.round((event.loaded / event.total) * 85));
+            }
           }
-        })
-      );
+        });
+
+        let thumbnailKey;
+        if (thumbnailFile) {
+          const thumbnailUpload = await api.post("/uploads/signed-url", {
+            fileName: thumbnailFile.name,
+            contentType: thumbnailFile.type || "image/jpeg",
+            type: "thumbnail",
+            videoId
+          });
+
+          if (!thumbnailUpload.data?.success) {
+            throw new Error(thumbnailUpload.data?.message || "Signed uploads are not available.");
+          }
+
+          thumbnailKey = thumbnailUpload.data.key;
+          await axios.put(thumbnailUpload.data.uploadUrl, thumbnailFile, {
+            headers: { "Content-Type": thumbnailFile.type || "image/jpeg" },
+            onUploadProgress: (event) => {
+              if (event.total) {
+                setProgress(85 + Math.round((event.loaded / event.total) * 10));
+              }
+            }
+          });
+        }
+
+        setProgress(95);
+        await api.post("/videos/upload", {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category.trim(),
+          tags: formData.tags.trim(),
+          visibility: formData.visibility,
+          videoId,
+          originalKey: key,
+          thumbnailKey,
+          fileSize: videoFile.size
+        });
+        setProgress(100);
+      } else {
+        const payload = new FormData();
+        payload.append("title", formData.title.trim());
+        payload.append("description", formData.description.trim());
+        payload.append("category", formData.category.trim());
+        payload.append("tags", formData.tags.trim());
+        payload.append("visibility", formData.visibility);
+        payload.append("video", videoFile);
+
+        if (thumbnailFile) {
+          payload.append("thumbnail", thumbnailFile);
+        }
+
+        await api.post(
+          "/videos/upload",
+          payload,
+          createUploadConfig((event) => {
+            if (event.total) {
+              setProgress(Math.round((event.loaded / event.total) * 100));
+            }
+          })
+        );
+      }
 
       setStatus({
         type: "success",

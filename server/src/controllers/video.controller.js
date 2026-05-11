@@ -6,7 +6,7 @@ const User = require("../models/user.model");
 const { MAX_THUMBNAIL_SIZE } = require("../middleware/upload.middleware");
 const storageProvider = require("../services/storage/storageProvider");
 const { addVideoProcessingJob, addVideoRetryJob, getVideoJobStatus, removeVideoJob } = require("../queues/videoProcessing.queue");
-const { getOriginalVideoKey } = require("../utils/storageKeys");
+const { getOriginalVideoKey, getOriginalThumbnailKey } = require("../utils/storageKeys");
 const { generateSearchKeywords } = require("../utils/searchKeywords");
 
 const VISIBILITY_VALUES = new Set(["public", "private", "unlisted"]);
@@ -115,43 +115,78 @@ const uploadVideo = async (req, res, next) => {
     }
 
     const videoFile = req.files?.video?.[0];
-    if (!videoFile) {
+    const thumbnailFile = req.files?.thumbnail?.[0];
+    const isDirectUpload = !videoFile && Boolean(req.body.originalKey);
+
+    if (!videoFile && !isDirectUpload) {
       res.status(400);
       throw new Error("Video file is required");
     }
 
-    const thumbnailFile = req.files?.thumbnail?.[0];
     if (thumbnailFile && thumbnailFile.size > MAX_THUMBNAIL_SIZE) {
       res.status(400);
       throw new Error("Thumbnail size must be 5MB or less");
     }
 
+    if (isDirectUpload && process.env.STORAGE_PROVIDER !== "s3") {
+      res.status(400);
+      throw new Error("Direct uploads require STORAGE_PROVIDER=s3");
+    }
+
+    const storageProviderName = process.env.STORAGE_PROVIDER || "local";
+
     // 1. Create Video document with initial status
+    const videoId = isDirectUpload ? req.body.videoId : undefined;
+    if (isDirectUpload && (!videoId || !mongoose.isValidObjectId(videoId))) {
+      res.status(400);
+      throw new Error("videoId is required for direct uploads");
+    }
+
     const video = new Video({
+      _id: isDirectUpload ? new mongoose.Types.ObjectId(videoId) : undefined,
       title,
       description,
       category,
       tags,
       visibility,
       owner: req.user._id,
-      fileSize: videoFile.size,
+      fileSize: isDirectUpload ? Number(req.body.fileSize || 0) : videoFile.size,
       searchKeywords: generateSearchKeywords(
         { title, description, category, tags },
         req.user
       ),
       status: "uploaded",
-      storageProvider: process.env.STORAGE_PROVIDER || "local",
+      storageProvider: storageProviderName,
       processingProgress: 0,
       processingError: ""
     });
 
-    // 2. Upload original video to storage provider
-    const originalKey = getOriginalVideoKey(video._id, videoFile.originalname);
-    const originalUrl = await storageProvider.uploadFile({
-      localPath: videoFile.path,
-      key: originalKey,
-      contentType: videoFile.mimetype
-    });
+    // 2. Upload original video to storage provider (or validate direct upload)
+    let originalKey;
+    let originalUrl;
+
+    if (isDirectUpload) {
+      originalKey = String(req.body.originalKey || "").trim();
+      if (!originalKey.startsWith(`videos/${video._id}/original/`)) {
+        res.status(400);
+        throw new Error("Invalid originalKey for video");
+      }
+
+      const originalExists = await storageProvider.fileExists(originalKey);
+      if (!originalExists) {
+        res.status(400);
+        throw new Error("Uploaded video not found in storage");
+      }
+
+      originalUrl = storageProvider.getPublicUrl(originalKey);
+    } else {
+      originalKey = getOriginalVideoKey(video._id, videoFile.originalname);
+      originalUrl = await storageProvider.uploadFile({
+        localPath: videoFile.path,
+        key: originalKey,
+        contentType: videoFile.mimetype
+      });
+    }
 
     video.originalFileKey = originalKey;
     video.originalFileUrl = originalUrl;
@@ -159,16 +194,38 @@ const uploadVideo = async (req, res, next) => {
     video.videoFile = video.originalFile; // backward compatibility
 
     // 3. Optional: Upload provided thumbnail
-    if (thumbnailFile) {
-      const thumbnailKey = `videos/${video._id}/thumbnails/original_${thumbnailFile.originalname}`;
-      const thumbnailUrl = await storageProvider.uploadFile({
-        localPath: thumbnailFile.path,
-        key: thumbnailKey,
-        contentType: thumbnailFile.mimetype
-      });
-      video.thumbnailKey = thumbnailKey;
-      video.thumbnailUrl = thumbnailUrl;
-      video.thumbnail = thumbnailUrl.includes("http") ? thumbnailUrl : `/uploads/${thumbnailKey}`;
+    if (thumbnailFile || req.body.thumbnailKey) {
+      let thumbnailKey;
+      let thumbnailUrl;
+
+      if (isDirectUpload && req.body.thumbnailKey) {
+        thumbnailKey = String(req.body.thumbnailKey || "").trim();
+        if (!thumbnailKey.startsWith(`videos/${video._id}/thumbnails/`)) {
+          res.status(400);
+          throw new Error("Invalid thumbnailKey for video");
+        }
+
+        const thumbnailExists = await storageProvider.fileExists(thumbnailKey);
+        if (!thumbnailExists) {
+          res.status(400);
+          throw new Error("Uploaded thumbnail not found in storage");
+        }
+
+        thumbnailUrl = storageProvider.getPublicUrl(thumbnailKey);
+      } else if (thumbnailFile) {
+        thumbnailKey = getOriginalThumbnailKey(video._id, thumbnailFile.originalname);
+        thumbnailUrl = await storageProvider.uploadFile({
+          localPath: thumbnailFile.path,
+          key: thumbnailKey,
+          contentType: thumbnailFile.mimetype
+        });
+      }
+
+      if (thumbnailKey && thumbnailUrl) {
+        video.thumbnailKey = thumbnailKey;
+        video.thumbnailUrl = thumbnailUrl;
+        video.thumbnail = thumbnailUrl.includes("http") ? thumbnailUrl : `/uploads/${thumbnailKey}`;
+      }
     }
 
     // 4. Add background processing job
@@ -180,8 +237,12 @@ const uploadVideo = async (req, res, next) => {
     await syncUserVideoTotals(req.user._id);
 
     // Cleanup temp Multer files
-    fs.remove(videoFile.path).catch(console.error);
-    if (thumbnailFile) fs.remove(thumbnailFile.path).catch(console.error);
+    if (videoFile?.path) {
+      fs.remove(videoFile.path).catch(console.error);
+    }
+    if (thumbnailFile?.path) {
+      fs.remove(thumbnailFile.path).catch(console.error);
+    }
 
     res.status(201).json({
       success: true,

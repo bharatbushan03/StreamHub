@@ -9,6 +9,11 @@ const getOriginalVideoKey = (videoId, filename) => {
   return `videos/${videoId}/original/original${ext}`;
 };
 
+const getOriginalThumbnailKey = (videoId, filename) => {
+  const safeName = sanitizeFilename(filename || "thumbnail.jpg");
+  return `videos/${videoId}/thumbnails/original_${safeName}`;
+};
+
 const getThumbnailKey = (videoId) => {
   return `videos/${videoId}/thumbnails/thumbnail.jpg`;
 };
@@ -24,6 +29,7 @@ const getMasterPlaylistKey = (videoId) => {
 module.exports = {
   sanitizeFilename,
   getOriginalVideoKey,
+  getOriginalThumbnailKey,
   getThumbnailKey,
   getHlsBaseKey,
   getMasterPlaylistKey
