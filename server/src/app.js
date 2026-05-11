@@ -80,8 +80,18 @@ const corsOptions = {
 const jsonLimit = process.env.JSON_BODY_LIMIT || "2mb";
 const urlEncodedLimit = process.env.URLENCODED_BODY_LIMIT || "2mb";
 
-if (process.env.TRUST_PROXY !== undefined) {
-  app.set("trust proxy", process.env.TRUST_PROXY);
+const parseTrustProxy = (value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const trustProxyValue = parseTrustProxy(process.env.TRUST_PROXY);
+if (trustProxyValue !== undefined) {
+  app.set("trust proxy", trustProxyValue);
 } else if (isProduction) {
   app.set("trust proxy", 1);
 }

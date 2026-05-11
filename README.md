@@ -33,18 +33,28 @@ Server: `server/.env`
 
 ```env
 PORT=5000
+NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/streamhub
 CLIENT_URL=http://localhost:5173
 
 ACCESS_TOKEN_SECRET=your_access_token_secret
+ACCESS_TOKEN_EXPIRY=1h
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
+REFRESH_TOKEN_EXPIRY=7d
+
+CORS_ALLOWED_ORIGINS=
+JSON_BODY_LIMIT=2mb
+URLENCODED_BODY_LIMIT=2mb
+TRUST_PROXY=1
 
 STORAGE_PROVIDER=local
 LOCAL_UPLOAD_BASE_URL=http://localhost:5000/uploads
 
+QUEUE_ENABLED=true
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-ENABLE_WORKER_IN_SERVER=true
+REDIS_URL=
+ENABLE_WORKER_IN_SERVER=false
 
 EMAIL_SERVICE=gmail
 EMAIL_HOST=smtp.gmail.com
@@ -92,6 +102,22 @@ VITE_SOCKET_URL=http://localhost:5000
 2. Start backend: `cd server && npm run dev`
 3. Start worker if `ENABLE_WORKER_IN_SERVER=false`: `cd server && npm run worker`
 4. Start frontend: `cd client && npm run dev`
+
+## Docker (Local Production)
+
+1. Copy and update the server environment file:
+  - `cp server/.env.example server/.env`
+2. Build and start the stack:
+  - `docker compose up --build`
+
+The client image bakes `VITE_API_BASE_URL` and `VITE_SOCKET_URL` at build time. Update the build args in `docker-compose.yml` for a different API URL.
+
+## GCP Cloud Run
+
+- Build and push the API image from `server/`, then deploy to Cloud Run.
+- Set Cloud Run environment variables (including `PORT=8080`, `NODE_ENV=production`, `CLIENT_URL`, `CORS_ALLOWED_ORIGINS`, `MONGO_URI`, `REDIS_*`, and JWT secrets).
+- For production storage, use `STORAGE_PROVIDER=s3` with an S3-compatible endpoint (Cloud Storage supports the S3 API) because the Cloud Run filesystem is ephemeral.
+- Build and deploy the client image from `client/` (or host the static build on Cloud Storage + CDN). Set `VITE_API_BASE_URL` at build time to the API URL.
 
 ## Testing Real-Time Notifications
 
