@@ -205,7 +205,10 @@ const updateMyChannel = async (req, res, next) => {
 const getChannelVideos = async (req, res, next) => {
   try {
     const channel = await getChannelUser(req.params.username);
-    const { page, limit } = parsePagination(req.query);
+    const { page, limit, skip } = req.pagination || {
+      ...parsePagination(req.query),
+      skip: (parsePagination(req.query).page - 1) * parsePagination(req.query).limit
+    };
     const sortBy = getString(req.query.sortBy) || "latest";
 
     if (!SORT_OPTIONS[sortBy]) {
@@ -224,7 +227,7 @@ const getChannelVideos = async (req, res, next) => {
     const videos = await Video.find(query)
       .populate("owner", "username fullName avatar channelName")
       .sort(SORT_OPTIONS[sortBy])
-      .skip((page - 1) * limit)
+      .skip(skip)
       .limit(limit);
 
     res.status(200).json({
