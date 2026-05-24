@@ -44,7 +44,7 @@ const storage = multer.diskStorage({
       return cb(null, originalsDir);
     }
 
-    if (file.fieldname === "thumbnail") {
+    if (file.fieldname === "thumbnail" || file.fieldname === "avatar" || file.fieldname === "banner") {
       return cb(null, thumbnailsDir);
     }
 
@@ -69,9 +69,9 @@ const fileFilter = (req, file, cb) => {
     return cb(null, true);
   }
 
-  if (file.fieldname === "thumbnail") {
+  if (file.fieldname === "thumbnail" || file.fieldname === "avatar" || file.fieldname === "banner") {
     if (!THUMBNAIL_EXTENSIONS.has(extension) || !THUMBNAIL_MIME_TYPES.has(file.mimetype)) {
-      const error = new Error("Unsupported thumbnail format. Use jpg, jpeg, png, or webp.");
+      const error = new Error("Unsupported image format. Use jpg, jpeg, png, or webp.");
       error.statusCode = 400;
       return cb(error);
     }
@@ -97,10 +97,14 @@ const uploadVideoFiles = upload.fields([
 ]);
 
 const uploadThumbnail = upload.single("thumbnail");
+const uploadAvatar = upload.single("avatar");
+const uploadBanner = upload.single("banner");
 
 module.exports = {
   uploadVideoFiles,
   uploadThumbnail,
+  uploadAvatar,
+  uploadBanner,
   MAX_THUMBNAIL_SIZE,
   uploadsRoot,
   originalsDir,
