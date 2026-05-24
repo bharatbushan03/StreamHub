@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 const User = require("../models/user.model");
 const Video = require("../models/video.model");
 const { generateSearchKeywords } = require("../utils/searchKeywords");
+const { cleanupLocalFile } = require("../utils/fileCleanup");
+const storageProvider = require("../services/storage/storageProvider");
+const { getOriginalThumbnailKey } = require("../utils/storageKeys");
+const { MAX_THUMBNAIL_SIZE } = require("../middleware/upload.middleware");
 
 const SORT_OPTIONS = {
   latest: { createdAt: -1 },
@@ -271,9 +275,125 @@ const getCreatorDashboardStats = async (req, res, next) => {
   }
 };
 
+const updateMyChannelAvatar = async (req, res, next) => {
+  try {
+    if (!req.file && !req.body.avatarKey) {
+      throw createError("Please upload an avatar image file or provide an avatarKey", 400);
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw createError("User not found", 404);
+    }
+
+    const isDirectUpload = process.env.STORAGE_PROVIDER === "s3" && req.body.avatarKey;
+    let avatarUrl = "";
+    let avatarKey = "";
+
+    if (isDirectUpload) {
+      avatarKey = String(req.body.avatarKey).trim();
+      const exists = await storageProvider.fileExists(avatarKey);
+      if (!exists) {
+        throw createError("Uploaded avatar not found in storage", 404);
+      }
+      avatarUrl = storageProvider.getPublicUrl(avatarKey);
+    } else if (req.file) {
+      if (req.file.size > MAX_THUMBNAIL_SIZE) {
+        throw createError("Avatar size must be 5MB or less", 400);
+      }
+
+      if (process.env.STORAGE_PROVIDER === "s3") {
+        avatarKey = getOriginalThumbnailKey(user._id, req.file.originalname);
+        avatarUrl = await storageProvider.uploadFile({
+          localPath: req.file.path,
+          key: avatarKey,
+          contentType: req.file.mimetype
+        });
+      } else {
+        avatarKey = `thumbnails/${req.file.filename}`;
+        avatarUrl = `/uploads/${avatarKey}`;
+      }
+    }
+
+    if (user.avatar) {
+      await cleanupLocalFile(user.avatar);
+    }
+
+    user.avatar = avatarUrl;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Avatar updated successfully",
+      avatar: user.avatar
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateMyChannelBanner = async (req, res, next) => {
+  try {
+    if (!req.file && !req.body.bannerKey) {
+      throw createError("Please upload a banner image file or provide a bannerKey", 400);
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw createError("User not found", 404);
+    }
+
+    const isDirectUpload = process.env.STORAGE_PROVIDER === "s3" && req.body.bannerKey;
+    let bannerUrl = "";
+    let bannerKey = "";
+
+    if (isDirectUpload) {
+      bannerKey = String(req.body.bannerKey).trim();
+      const exists = await storageProvider.fileExists(bannerKey);
+      if (!exists) {
+        throw createError("Uploaded banner not found in storage", 404);
+      }
+      bannerUrl = storageProvider.getPublicUrl(bannerKey);
+    } else if (req.file) {
+      if (req.file.size > MAX_THUMBNAIL_SIZE) {
+        throw createError("Banner size must be 5MB or less", 400);
+      }
+
+      if (process.env.STORAGE_PROVIDER === "s3") {
+        bannerKey = getOriginalThumbnailKey(user._id, req.file.originalname);
+        bannerUrl = await storageProvider.uploadFile({
+          localPath: req.file.path,
+          key: bannerKey,
+          contentType: req.file.mimetype
+        });
+      } else {
+        bannerKey = `thumbnails/${req.file.filename}`;
+        bannerUrl = `/uploads/${bannerKey}`;
+      }
+    }
+
+    if (user.channelBanner) {
+      await cleanupLocalFile(user.channelBanner);
+    }
+
+    user.channelBanner = bannerUrl;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Channel banner updated successfully",
+      channelBanner: user.channelBanner
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getChannelByUsername,
   updateMyChannel,
   getChannelVideos,
-  getCreatorDashboardStats
+  getCreatorDashboardStats,
+  updateMyChannelAvatar,
+  updateMyChannelBanner
 };
