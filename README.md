@@ -86,6 +86,8 @@ VITE_DIRECT_UPLOADS=false
   - `/api/activity/feed`
   - `/api/activity/public`
   - `/api/activity/channel/:username`
+  - `/api/channels/me/avatar` (PATCH)
+  - `/api/channels/me/banner` (PATCH)
 
 ## New Frontend Pieces
 
@@ -96,6 +98,10 @@ VITE_DIRECT_UPLOADS=false
   - `/notifications`
   - `/notification-preferences`
   - `/activity`
+
+## Documentation
+
+- [API.md](file:///c:/Users/dell/Desktop/StreamHub/server/API.md): Detailed API reference covering authorization, routes, body payloads, and validation middleware.
 
 ## How to Run
 
